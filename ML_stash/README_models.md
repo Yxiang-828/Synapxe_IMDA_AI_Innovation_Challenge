@@ -1,65 +1,58 @@
-# Health Screening ML Models - Testing Guide
+# Health Screening ML Analysis - User Guide
 
-This directory (`ML_stash`) contains prototype scripts for detecting health conditions from voice data.
+This directory (`ML_stash`) contains the analysis engine for screening health conditions from voice data.
 
-## 1. Environment Setup
+## 1. Environment Setup (First Run Only)
 
-**Step 1:** Open your terminal in the project root: `C:\Users\xiang\Synapxe`
+**Step 1:** Activate the environment.
+In terminal, process root, run:
+```cmd
+activate
+```
+*(This uses the `activate.bat` in the root folder)*
 
-**Step 2:** Locate your Python Virtual Environment
-We need to use the specific Python installation where the libraries are installed.
-- On Windows (PowerShell), use: `.\.venv\Scripts\python.exe`
-
-**Step 3:** Install Dependencies (if not already done)
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r ML_stash/requirements.txt
+**Step 2:** Install libraries.
+```bash
+pip install -r ML_stash/requirements.txt
 ```
 
 ---
 
-## 2. Generating Test Data
+## 2. How to Use
 
-Generate the dummy audio file using the virtual environment python:
+### Step A: Add Audio Files
+Place any audio files you want to analyze (`.mp3`, `.wav`, or `.flac`) into the **Input Folder**:
+> `ML_stash/audio_input/`
 
-```powershell
-.\.venv\Scripts\python.exe ML_stash/generate_audio.py
+### Step B: Run Analysis
+Run the specific analysis script you need:
+
+**1. Voice Fatigue Detection:**
+```bash
+python ML_stash/VoiceFatigue/detect_voice_fatigue.py
 ```
 
-**Expected Output:**
-> sample.wav created successfully.
+**2. Cognitive Decline Screening:**
+```bash
+python ML_stash/CognitiveDecline/detect_cognitive_decline.py
+```
+
+**3. Depression Screening:**
+```bash
+python ML_stash/DepressionScreening/detect_depression.py
+```
+
+### Step C: View Results
+Once the script finishes, check the **Output Folder**:
+> `ML_stash/audio_output/`
+
+You will find a generated Markdown report (e.g., `myfile_fatigue_report.md`) for every audio file processed.
 
 ---
 
-## 3. Testing the Models
-
-### A. Voice Fatigue Detection
-**Run:**
-```powershell
-.\.venv\Scripts\python.exe ML_stash/VoiceFatigue/detect_voice_fatigue.py
-```
-**Expected Output:**
-> Prediction: Fatigued (or Normal)
-> Fatigue Probability: 1.0000
-
-### B. Cognitive Decline Screening
-**Run:**
-```powershell
-.\.venv\Scripts\python.exe ML_stash/CognitiveDecline/detect_cognitive_decline.py
-```
-**Expected Output:**
-> Prediction: Healthy (or Cognitive Decline Risk)
-> Risk Probability: 0.3005
-
-### C. Depression Screening
-**Run:**
-```powershell
-.\.venv\Scripts\python.exe ML_stash/DepressionScreening/detect_depression.py
-```
-**Expected Output:**
-> Prediction: Depression Risk (or Normal Range)
-> Depression Probability Score: 0.6200
-
----
-
-## Troubleshooting
-- **"ModuleNotFoundError"**: This happens if you use the wrong `python` command. Always use `.\.venv\Scripts\python.exe` instead of just `python`.
+## Folder Structure
+- **`audio_input/`**: Drop your MP3/WAV files here.
+- **`audio_output/`**: Reports appear here.
+- **`VoiceFatigue/`**: Engine for fatigue detection.
+- **`CognitiveDecline/`**: Engine for cognitive screening.
+- **`DepressionScreening/`**: Engine for depression screening.
