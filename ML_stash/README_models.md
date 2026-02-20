@@ -1,37 +1,65 @@
-# Health Screening ML Models
+# Health Screening ML Models - Testing Guide
 
-This directory contains prototype scripts for detecting health conditions from voice data.
+This directory (`ML_stash`) contains prototype scripts for detecting health conditions from voice data.
 
-## Setup
+## 1. Environment Setup
 
-1.  Make sure you have Python installed (3.8+ recommended).
-2.  Install dependencies:
-    ```bash
-    pip install -r requirements.txt
-    ```
+**Step 1:** Open your terminal in the project root: `C:\Users\xiang\Synapxe`
 
-## Usage
+**Step 2:** Locate your Python Virtual Environment
+We need to use the specific Python installation where the libraries are installed.
+- On Windows (PowerShell), use: `.\.venv\Scripts\python.exe`
 
-First, generate a sample audio file if one doesn't exist:
-```bash
-python generate_audio.py
-```
-This creates `sample.wav` in this directory.
-
-### 1. Voice Fatigue Detection
-Uses `speechbrain` (ECAPA-TDNN) to extract embeddings and a classifier to detect fatigue.
-```bash
-python VoiceFatigue/detect_voice_fatigue.py
+**Step 3:** Install Dependencies (if not already done)
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r ML_stash/requirements.txt
 ```
 
-### 2. Cognitive Decline Screening
-Uses `transformers` (HuBERT) to extract embeddings for cognitive assessment.
-```bash
-python CognitiveDecline/detect_cognitive_decline.py
+---
+
+## 2. Generating Test Data
+
+Generate the dummy audio file using the virtual environment python:
+
+```powershell
+.\.venv\Scripts\python.exe ML_stash/generate_audio.py
 ```
 
-### 3. Depression Screening
-Uses `librosa` and `pyAudioAnalysis` for acoustic feature extraction.
-```bash
-python DepressionScreening/detect_depression.py
+**Expected Output:**
+> sample.wav created successfully.
+
+---
+
+## 3. Testing the Models
+
+### A. Voice Fatigue Detection
+**Run:**
+```powershell
+.\.venv\Scripts\python.exe ML_stash/VoiceFatigue/detect_voice_fatigue.py
 ```
+**Expected Output:**
+> Prediction: Fatigued (or Normal)
+> Fatigue Probability: 1.0000
+
+### B. Cognitive Decline Screening
+**Run:**
+```powershell
+.\.venv\Scripts\python.exe ML_stash/CognitiveDecline/detect_cognitive_decline.py
+```
+**Expected Output:**
+> Prediction: Healthy (or Cognitive Decline Risk)
+> Risk Probability: 0.3005
+
+### C. Depression Screening
+**Run:**
+```powershell
+.\.venv\Scripts\python.exe ML_stash/DepressionScreening/detect_depression.py
+```
+**Expected Output:**
+> Prediction: Depression Risk (or Normal Range)
+> Depression Probability Score: 0.6200
+
+---
+
+## Troubleshooting
+- **"ModuleNotFoundError"**: This happens if you use the wrong `python` command. Always use `.\.venv\Scripts\python.exe` instead of just `python`.
