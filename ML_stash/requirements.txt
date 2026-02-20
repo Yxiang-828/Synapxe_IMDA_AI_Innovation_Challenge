@@ -1,0 +1,11 @@
+torch>=2.0.0
+torchaudio>=2.0.0
+speechbrain>=0.5.14
+transformers
+scikit-learn
+librosa
+soundfile
+numpy
+scipy
+pyAudioAnalysis
+huggingface_hub<0.23.0
