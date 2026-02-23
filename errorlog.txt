@@ -1,0 +1,28 @@
+What the `start_rehab_ai.bat` output is telling you is exactly what we saw when running the installs by hand:
+
+1. The **one‑shot setup** script activates the virtualenv and then runs `pip install -r requirements.txt`.
+2. During that install it immediately hits a package that doesn’t exist on PyPI:
+
+   ```
+   ERROR: Could not find a version that satisfies the requirement audioop-lts==0.2.2
+   ERROR: No matching distribution found for audioop-lts==0.2.2
+   ```
+
+   `pip` stops at that point, so it never gets around to installing the rest of the list – including **`opencv-python`/`opencv-contrib-python`**, which provide the `cv2` module.
+
+3. When the batch file then tries to launch `webcam_tracker.py` the script fails on the first import:
+
+   ```
+   import cv2
+   ModuleNotFoundError: No module named 'cv2'
+   ```
+
+   That’s simply a side‑effect of the earlier install failure; `cv2` was never installed because the requirements installation aborted.
+
+So the “issue” is not in the tracker itself, it’s in the dependencies file. You need to fix the environment before the script will run:
+
+- Remove or comment out the `audioop-lts==0.2.2` line (or otherwise make that package available from a private index).
+- Re‑run the installer (`pip install -r RehabAI_Pipeline\requirements.txt` or rerun the batch).
+- Ensure `opencv-python` (and `mediapipe` if needed) installs successfully – you can also install them manually with `pip install opencv-python mediapipe`.
+
+Once the requirements file can be installed without errors, the virtualenv will contain `cv2` and the webcam tracker will start normally.
