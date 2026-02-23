@@ -1,6 +1,6 @@
 @echo off
 echo ===================================================
-echo Rehab AI Pipeline - One-Shot Setup & Launch
+echo Rehab AI Pipeline - One-Shot Setup and Launch
 echo ===================================================
 
 REM 1. Check if virtual environment exists
@@ -28,7 +28,21 @@ if errorlevel 1 (
     echo [INFO] All dependencies are already installed.
 )
 
-REM 2. Launch the Application
+REM 2. Check for AI Model File
+if not exist "pose_landmarker_lite.task" (
+    echo [INFO] AI Model not found. Downloading pose_landmarker_lite.task...
+    powershell -Command "Invoke-WebRequest -Uri 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task' -OutFile 'pose_landmarker_lite.task'"
+    if errorlevel 1 (
+        echo [ERROR] Failed to download the AI model. Check your internet connection.
+        pause
+        exit /b
+    )
+    echo [INFO] AI Model downloaded successfully!
+) else (
+    echo [INFO] AI Model found.
+)
+
+REM 3. Launch the Application
 echo [INFO] Launching Webcam Tracker...
 python webcam_tracker.py
 if errorlevel 1 (

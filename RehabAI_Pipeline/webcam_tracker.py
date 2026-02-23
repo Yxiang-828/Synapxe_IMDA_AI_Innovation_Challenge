@@ -6,8 +6,14 @@ import numpy as np
 from kinematics import calculate_angle
 from time_series_tracker import ExerciseTracker
 
+import os
+
+# Get the absolute path to the directory containing this script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+model_path = os.path.join(script_dir, 'pose_landmarker_lite.task')
+
 # Setup the modern Tasks API Landmarker
-base_options = python.BaseOptions(model_asset_path='RehabAI_Pipeline/pose_landmarker_lite.task')
+base_options = python.BaseOptions(model_asset_path=model_path)
 options = vision.PoseLandmarkerOptions(
     base_options=base_options,
     output_segmentation_masks=False)
