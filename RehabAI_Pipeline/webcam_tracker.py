@@ -7,6 +7,7 @@ from kinematics import calculate_angle
 from time_series_tracker import ExerciseTracker
 
 import os
+import time
 
 # Get the absolute path to the directory containing this script
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -37,6 +38,7 @@ def main():
     # Initialize the first test
     current_test_idx = 0
     tracker = ExerciseTracker(exercise_type=test_queue[current_test_idx]["name"], window_size=30)
+    test_start_time = time.time()
     
     print("Starting Clinical Testing Pipeline... Press 'q' to exit early.")
 
@@ -47,8 +49,11 @@ def main():
         
         target_reps = test_queue[current_test_idx]["target_reps"]
         
+        elapsed_time = time.time() - test_start_time
+        time_left = max(15.0 - elapsed_time, 0.0)
+        
         # --- Check for Test Completion ---
-        if tracker.rep_count >= target_reps:
+        if time_left <= 0:
             # Save the Detailed Metrics
             clinical_results[tracker.exercise_type] = {
                 "score": tracker.current_score,
@@ -67,6 +72,7 @@ def main():
             # Re-initialize the tracker for the next exercise
             new_test = test_queue[current_test_idx]["name"]
             tracker = ExerciseTracker(exercise_type=new_test, window_size=30)
+            test_start_time = time.time() # Reset clock for new exercise
             print(f"[STARTING NEXT TEST] {new_test}...")
             continue # Skip rendering this transition frame
 
@@ -168,15 +174,41 @@ def main():
                 px = tuple(np.multiply(joint_pos, [w, h]).astype(int))
                 cv2.putText(frame, str(int(angle_val)), px, cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
                         
-            # UI Dashboard (Top Left Corner)
-            cv2.rectangle(frame, (0,0), (400, 160), (245, 117, 16), -1)
-            cv2.putText(frame, f"STATE: {stats['state']}", (15, 30), 
+            # --- Top Banner: Activity & Direction ---
+            if tracker.exercise_type == "seated_knee_extension":
+                ex_name = "SEATED KNEE EXTENSION"
+                ex_dir = "DIRECTION: SIDE FACING"
+            elif tracker.exercise_type == "shoulder_abduction":
+                ex_name = "SHOULDER ABDUCTION"
+                ex_dir = "DIRECTION: FRONT FACING"
+            elif tracker.exercise_type == "standing_march":
+                ex_name = "STANDING MARCH"
+                ex_dir = "DIRECTION: SIDE FACING"
+            else:
+                ex_name = tracker.exercise_type.upper()
+                ex_dir = "DIRECTION: ANY"
+
+            banner_text = f"ACTIVITY: {ex_name}  |  {ex_dir}"
+            text_size = cv2.getTextSize(banner_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+            text_x = int((w - text_size[0]) / 2)
+            
+            # Draw black background bar at top-center
+            cv2.rectangle(frame, (text_x - 15, 0), (text_x + text_size[0] + 15, 40), (0, 0, 0), -1)
+            # Draw yellow text
+            cv2.putText(frame, banner_text, (text_x, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2, cv2.LINE_AA)
+
+            # --- UI Dashboard (Top Left Corner) ---
+            # Shifted down slightly to prevent overlapping with the banner
+            cv2.rectangle(frame, (0, 45), (420, 245), (245, 117, 16), -1)
+            cv2.putText(frame, f"TIME LEFT: {int(time_left)}s", (15, 75), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
-            cv2.putText(frame, f"REPETITIONS: {stats['reps']}/{target_reps}", (15, 70), 
+            cv2.putText(frame, f"STATE: {stats['state']}", (15, 115), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
-            cv2.putText(frame, f"SCORE: {stats['score']}", (15, 110), 
+            cv2.putText(frame, f"REPETITIONS: {stats['reps']}/{target_reps}", (15, 155), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
-            cv2.putText(frame, f"FEEDBACK: {stats['feedback']}", (15, 150), 
+            cv2.putText(frame, f"SCORE: {stats['score']}/{target_reps * 100}", (15, 195), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.putText(frame, f"FEEDBACK: {stats['feedback']}", (15, 235), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, cv2.LINE_AA)
 
         # Display the video with overlaid analytics
