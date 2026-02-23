@@ -6,23 +6,23 @@ class ExerciseTracker:
         self.exercise_type = exercise_type
         self.angle_window = deque(maxlen=window_size)
         
-        self.state = "DOWN"
+        self.state = "IDLE"
         self.rep_count = 0
         self.current_score = 0
         
-        # Immediate clear instructions
         if self.exercise_type == "seated_knee_extension":
-            self.feedback = "Sit in chair, camera side. Action: Knee Extension."
+            self.feedback = "Ready. Straighten your leg."
         elif self.exercise_type == "shoulder_abduction":
-            self.feedback = "Stand facing camera. Action: Shoulder Abduction."
+            self.feedback = "Ready. Raise arm to the side."
         elif self.exercise_type == "standing_march":
-            self.feedback = "Stand sideways, hold chair. Action: Standing March."
+            self.feedback = "Ready. March your knee up."
         else:
             self.feedback = "Ready. Begin!"
 
     def process_frame_angles(self, current_angle):
         self.angle_window.append(current_angle)
         
+        # Need enough history to check if moving up/down (e.g. comparing to 5 frames ago)
         if len(self.angle_window) < 5:
             return
 
@@ -34,58 +34,76 @@ class ExerciseTracker:
             self._evaluate_standing_march()
 
     def _evaluate_knee_extension(self):
-        # Angle goes UP when extending leg (90 -> 160+)
+        # Track: Hip-Knee-Ankle (Angle increases as leg straightens)
+        # IDLE (~90) -> EXTENDING -> PEAK (~165+) -> IDLE
         current_angle = self.angle_window[-1]
+        past_angle = self.angle_window[-5]
         
-        if self.state == "DOWN":
-            if current_angle > 140:
-                self.state = "UP"
-                self.feedback = "Good extension! Now lower leg."
-            elif current_angle > 100:
-                self.feedback = "Keep straightening leg..."
+        if self.state == "IDLE" and current_angle > 110:
+            self.state = "EXTENDING"
+            self.feedback = "Keep straightening! Push higher."
+            
+        elif self.state == "EXTENDING":
+            if current_angle > 165:
+                self.state = "PEAK"
+                self.feedback = "Hold it! Perfect. Now lower slowly."
+            elif current_angle < 130 and current_angle < past_angle - 2:
+                # Dropped leg prematurely
+                self.feedback = "You dropped it early! Straighten fully."
                 
-        elif self.state == "UP":
-            if current_angle < 110:
-                self.state = "DOWN"
-                self.rep_count += 1
-                self.current_score += 100
-                self.feedback = f"Rep {self.rep_count}! Straighten leg again."
+        elif self.state == "PEAK" and current_angle < 100:
+            self.state = "IDLE"
+            self.rep_count += 1
+            self.current_score += 100
+            self.feedback = f"Good rep! [{self.rep_count}] Go again."
 
     def _evaluate_shoulder_abduction(self):
-        # Angle goes UP when raising arm (10 -> 140+)
+        # Track: Hip-Shoulder-Elbow (Angle increases as arm raises)
+        # IDLE (~10) -> RAISING -> PEAK (~150+) -> IDLE
         current_angle = self.angle_window[-1]
+        past_angle = self.angle_window[-5]
 
-        if self.state == "DOWN":
-            if current_angle > 130:
-                self.state = "UP"
-                self.feedback = "Good raise! Lower your arm."
-            elif current_angle > 40:
-                self.feedback = "Keep raising arm..."
+        if self.state == "IDLE" and current_angle > 40:
+            self.state = "RAISING"
+            self.feedback = "Keep raising! Reach for the sky."
+            
+        elif self.state == "RAISING":
+            if current_angle > 150:
+                self.state = "PEAK"
+                self.feedback = "Excellent height! Lower arm slowly."
+            elif current_angle < 80 and current_angle < past_angle - 2:
+                # Dropped arm prematurely
+                self.feedback = "Try to push higher next time!"
                 
-        elif self.state == "UP":
-            if current_angle < 40:
-                self.state = "DOWN"
-                self.rep_count += 1
-                self.current_score += 100
-                self.feedback = f"Rep {self.rep_count}! Raise arm again."
+        elif self.state == "PEAK" and current_angle < 40:
+            self.state = "IDLE"
+            self.rep_count += 1
+            self.current_score += 100
+            self.feedback = f"Great form! [{self.rep_count}] Raise again."
 
     def _evaluate_standing_march(self):
-        # Angle goes DOWN when lifting knee (180 -> 100-)
+        # Track: Shoulder-Hip-Knee (Angle decreases as knee lifts)
+        # IDLE (~170) -> LIFTING -> PEAK (<100) -> IDLE
         current_angle = self.angle_window[-1]
+        past_angle = self.angle_window[-5]
 
-        if self.state == "DOWN":
-            if current_angle < 120:
-                self.state = "UP"
-                self.feedback = "Good march! Lower your knee."
-            elif current_angle < 150:
-                self.feedback = "Keep lifting knee higher..."
+        if self.state == "IDLE" and current_angle < 150:
+            self.state = "LIFTING"
+            self.feedback = "Keep lifting! Knee higher."
+            
+        elif self.state == "LIFTING":
+            if current_angle < 100:
+                self.state = "PEAK"
+                self.feedback = "Hold balance! Lower leg slowly."
+            elif current_angle > 140 and current_angle > past_angle + 2:
+                # Put foot down prematurely
+                self.feedback = "Foot down too early! Lift higher."
                 
-        elif self.state == "UP":
-            if current_angle > 150:
-                self.state = "DOWN"
-                self.rep_count += 1
-                self.current_score += 100
-                self.feedback = f"Rep {self.rep_count}! March knee again."
+        elif self.state == "PEAK" and current_angle > 160:
+            self.state = "IDLE"
+            self.rep_count += 1
+            self.current_score += 100
+            self.feedback = f"Solid march! [{self.rep_count}] Knee up again."
         
     def get_stats(self):
         return {

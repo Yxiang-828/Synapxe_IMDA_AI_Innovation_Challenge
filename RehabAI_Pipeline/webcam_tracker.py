@@ -38,7 +38,10 @@ def main():
     # Initialize the first test
     current_test_idx = 0
     tracker = ExerciseTracker(exercise_type=test_queue[current_test_idx]["name"], window_size=30)
-    test_start_time = time.time()
+    
+    is_prep_phase = True
+    prep_start_time = time.time()
+    test_start_time = 0 # Will be explicitly set when prep finishes
     
     print("Starting Clinical Testing Pipeline... Press 'q' to exit early.")
 
@@ -49,11 +52,21 @@ def main():
         
         target_reps = test_queue[current_test_idx]["target_reps"]
         
-        elapsed_time = time.time() - test_start_time
-        time_left = max(15.0 - elapsed_time, 0.0)
+        if is_prep_phase:
+            elapsed_prep = time.time() - prep_start_time
+            prep_time_left = max(10.0 - elapsed_prep, 0.0)
+            if prep_time_left <= 0:
+                is_prep_phase = False
+                test_start_time = time.time()
+                time_left = 15.0
+            else:
+                time_left = 15.0 # Keep standard display variable bounded
+        else:
+            elapsed_time = time.time() - test_start_time
+            time_left = max(15.0 - elapsed_time, 0.0)
         
         # --- Check for Test Completion ---
-        if time_left <= 0:
+        if not is_prep_phase and time_left <= 0:
             # Save the Detailed Metrics
             clinical_results[tracker.exercise_type] = {
                 "score": tracker.current_score,
@@ -72,8 +85,11 @@ def main():
             # Re-initialize the tracker for the next exercise
             new_test = test_queue[current_test_idx]["name"]
             tracker = ExerciseTracker(exercise_type=new_test, window_size=30)
-            test_start_time = time.time() # Reset clock for new exercise
-            print(f"[STARTING NEXT TEST] {new_test}...")
+            
+            is_prep_phase = True
+            prep_start_time = time.time()
+            
+            print(f"[PREPARING NEXT TEST] {new_test}...")
             continue # Skip rendering this transition frame
 
         # Convert OpenCV's BGR format to RGB for MediaPipe
@@ -158,7 +174,8 @@ def main():
                 tracker.prev_r_wrist = r_wrist_curr
 
             # --- Phase 3: Time-Series Sequence Buffer ---
-            tracker.process_frame_angles(avg_angle)
+            if not is_prep_phase:
+                tracker.process_frame_angles(avg_angle)
             stats = tracker.get_stats()
             
             # --- Visualizing the Result for Debugging ---
@@ -174,45 +191,63 @@ def main():
                 px = tuple(np.multiply(joint_pos, [w, h]).astype(int))
                 cv2.putText(frame, str(int(angle_val)), px, cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
                         
-            # --- Top Banner: Activity & Direction ---
+            # --- UI Dashboard (Moved to Right Sidebar) ---
+            SIDEBAR_WIDTH = 420
+            
+            # Create a larger canvas: webcam frame on the left, black sidebar on the right
+            canvas = np.zeros((h, w + SIDEBAR_WIDTH, 3), dtype=np.uint8)
+            canvas[:, :w] = frame # Copy the webcam feed to the left side
+            
+            # --- Top Banner: Activity & Direction (Now in the Sidebar) ---
             if tracker.exercise_type == "seated_knee_extension":
-                ex_name = "SEATED KNEE EXTENSION"
-                ex_dir = "DIRECTION: SIDE FACING"
+                ex_name = "SEATED KNEE EXT."
+                ex_dir = "DIR: SIDE FACING"
             elif tracker.exercise_type == "shoulder_abduction":
-                ex_name = "SHOULDER ABDUCTION"
-                ex_dir = "DIRECTION: FRONT FACING"
+                ex_name = "SHOULDER ABD."
+                ex_dir = "DIR: FRONT FACING"
             elif tracker.exercise_type == "standing_march":
                 ex_name = "STANDING MARCH"
-                ex_dir = "DIRECTION: SIDE FACING"
+                ex_dir = "DIR: SIDE FACING"
             else:
                 ex_name = tracker.exercise_type.upper()
-                ex_dir = "DIRECTION: ANY"
+                ex_dir = "DIR: ANY"
+                
+            # Draw Sidebar Background
+            cv2.rectangle(canvas, (w, 0), (w + SIDEBAR_WIDTH, h), (30, 30, 30), -1)
 
-            banner_text = f"ACTIVITY: {ex_name}  |  {ex_dir}"
-            text_size = cv2.getTextSize(banner_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
-            text_x = int((w - text_size[0]) / 2)
+            # Draw Banner Background
+            cv2.rectangle(canvas, (w + 10, 10), (w + SIDEBAR_WIDTH - 10, 80), (0, 0, 0), -1)
+            cv2.putText(canvas, f"ACTIVITY: {ex_name}", (w + 20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA)
+            cv2.putText(canvas, f"{ex_dir}", (w + 20, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA)
+
+            # --- Dashboard Background ---
+            cv2.rectangle(canvas, (w + 10, 100), (w + SIDEBAR_WIDTH - 10, 310), (245, 117, 16), -1)
             
-            # Draw black background bar at top-center
-            cv2.rectangle(frame, (text_x - 15, 0), (text_x + text_size[0] + 15, 40), (0, 0, 0), -1)
-            # Draw yellow text
-            cv2.putText(frame, banner_text, (text_x, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2, cv2.LINE_AA)
-
-            # --- UI Dashboard (Top Left Corner) ---
-            # Shifted down slightly to prevent overlapping with the banner
-            cv2.rectangle(frame, (0, 45), (420, 245), (245, 117, 16), -1)
-            cv2.putText(frame, f"TIME LEFT: {int(time_left)}s", (15, 75), 
+            if is_prep_phase:
+                cv2.putText(canvas, f"PREPARING: {int(prep_time_left)}s", (w + 20, 140), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2, cv2.LINE_AA)
+            else:
+                cv2.putText(canvas, f"TIME LEFT: {int(time_left)}s", (w + 20, 140), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+                            
+            cv2.putText(canvas, f"STATE: {stats['state']}", (w + 20, 180), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
-            cv2.putText(frame, f"STATE: {stats['state']}", (15, 115), 
+            cv2.putText(canvas, f"REPETITIONS: {stats['reps']}/{target_reps}", (w + 20, 220), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
-            cv2.putText(frame, f"REPETITIONS: {stats['reps']}/{target_reps}", (15, 155), 
+            cv2.putText(canvas, f"SCORE: {stats['score']}/{target_reps * 100}", (w + 20, 260), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
-            cv2.putText(frame, f"SCORE: {stats['score']}/{target_reps * 100}", (15, 195), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
-            cv2.putText(frame, f"FEEDBACK: {stats['feedback']}", (15, 235), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, cv2.LINE_AA)
+            
+            # Action Feedback Block
+            cv2.rectangle(canvas, (w + 10, 330), (w + SIDEBAR_WIDTH - 10, h - 10), (0, 0, 0), -1)
+            cv2.putText(canvas, "SYSTEM FEEDBACK:", (w + 20, 360), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
+            
+            # Wrap long feedback text
+            feedback_text = "GET INTO POSITION!" if is_prep_phase else stats['feedback']
+            cv2.putText(canvas, feedback_text, (w + 20, 400), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255) if is_prep_phase else (0, 255, 0), 2, cv2.LINE_AA)
 
         # Display the video with overlaid analytics
-        cv2.imshow('Rehab AI - Kinematic Translation', frame)
+        cv2.imshow('Rehab AI - Kinematic Translation', canvas)
         
         # Break the loop if the user presses 'q'
         if cv2.waitKey(1) & 0xFF == ord('q'):
