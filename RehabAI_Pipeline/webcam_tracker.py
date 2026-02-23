@@ -25,12 +25,6 @@ detector = vision.PoseLandmarker.create_from_options(options)
 def main():
     cap = cv2.VideoCapture(0)
     
-    # --- PERFORMANCE OPTIMIZATION ---
-    # Downscale the webcam feed to 640x480. High-res webcams (1080p+) 
-    # severely lag the CPU MediaPipe detector without providing better kinematic data.
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    
     # Define the Clinical Test Progression & Goals
     test_queue = [
         {"name": "seated_knee_extension", "target_reps": 3}, # Shortened to 3 for quick testing
@@ -104,12 +98,6 @@ def main():
 
         # Step 1: Extract Local Keypoints Spatial Coordinates
         detection_result = detector.detect(mp_image)
-        
-        # Initialize the base UI Canvas for this frame
-        h, w, c = frame.shape
-        SIDEBAR_WIDTH = 420
-        canvas = np.zeros((h, w + SIDEBAR_WIDTH, 3), dtype=np.uint8)
-        canvas[:, :w] = frame # Always map the webcam to the left
 
         # Step 2: Kinematic Translation
         if len(detection_result.pose_landmarks) > 0:
@@ -174,58 +162,78 @@ def main():
                 tracker.prev_l_wrist = l_wrist_curr
                 tracker.prev_r_wrist = r_wrist_curr
 
-        # --- UI Dashboard (Moved to Right Sidebar) ---
-        
-        # --- Top Banner: Activity & Direction (Now in the Sidebar) ---
-        if tracker.exercise_type == "seated_knee_extension":
-            ex_name = "SEATED KNEE EXT."
-            ex_dir = "DIR: RIGHT-SIDE FACING"
-        elif tracker.exercise_type == "shoulder_abduction":
-            ex_name = "SHOULDER ABD."
-            ex_dir = "DIR: FRONT FACING"
-        elif tracker.exercise_type == "standing_march":
-            ex_name = "STANDING MARCH"
-            ex_dir = "DIR: RIGHT-SIDE FACING"
-        else:
-            ex_name = tracker.exercise_type.upper()
-            ex_dir = "DIR: ANY"
+            # --- Phase 3: Time-Series Sequence Buffer ---
+            if not is_prep_phase:
+                tracker.process_frame_angles(avg_angle)
+            stats = tracker.get_stats()
             
-        # Draw Sidebar Background
-        cv2.rectangle(canvas, (w, 0), (w + SIDEBAR_WIDTH, h), (30, 30, 30), -1)
-
-        # Draw Banner Background
-        cv2.rectangle(canvas, (w + 10, 10), (w + SIDEBAR_WIDTH - 10, 80), (0, 0, 0), -1)
-        cv2.putText(canvas, f"ACTIVITY: {ex_name}", (w + 20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA)
-        cv2.putText(canvas, f"{ex_dir}", (w + 20, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA)
-
-        # Get latest stats even if not tracking a person this frame
-        stats = tracker.get_stats()
-
-        # --- Dashboard Background ---
-        cv2.rectangle(canvas, (w + 10, 100), (w + SIDEBAR_WIDTH - 10, 310), (245, 117, 16), -1)
-        
-        if is_prep_phase:
-            cv2.putText(canvas, f"PREPARING: {int(prep_time_left)}s", (w + 20, 140), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2, cv2.LINE_AA)
-        else:
-            cv2.putText(canvas, f"TIME LEFT: {int(time_left)}s", (w + 20, 140), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+            # --- Visualizing the Result for Debugging ---
+            h, w, c = frame.shape
+            
+            # Draw circles on ALL active joints
+            for joint in joints_to_draw:
+                px = tuple(np.multiply(joint, [w, h]).astype(int))
+                cv2.circle(frame, px, 5, (0, 0, 255), -1) # Red dots
+            
+            # Display the calculated angle text
+            for angle_val, joint_pos in text_positions:
+                px = tuple(np.multiply(joint_pos, [w, h]).astype(int))
+                cv2.putText(frame, str(int(angle_val)), px, cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
                         
-        cv2.putText(canvas, f"STATE: {stats['state']}", (w + 20, 180), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
-        cv2.putText(canvas, f"REPETITIONS: {stats['reps']}/{target_reps}", (w + 20, 220), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
-        cv2.putText(canvas, f"SCORE: {stats['score']}/{target_reps * 100}", (w + 20, 260), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
-        
-        # Action Feedback Block
-        cv2.rectangle(canvas, (w + 10, 330), (w + SIDEBAR_WIDTH - 10, h - 10), (0, 0, 0), -1)
-        cv2.putText(canvas, "SYSTEM FEEDBACK:", (w + 20, 360), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
-        
-        # Wrap long feedback text
-        feedback_text = "GET INTO POSITION!" if is_prep_phase else stats['feedback']
-        cv2.putText(canvas, feedback_text, (w + 20, 400), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255) if is_prep_phase else (0, 255, 0), 2, cv2.LINE_AA)
+            # --- UI Dashboard (Moved to Right Sidebar) ---
+            SIDEBAR_WIDTH = 420
+            
+            # Create a larger canvas: webcam frame on the left, black sidebar on the right
+            canvas = np.zeros((h, w + SIDEBAR_WIDTH, 3), dtype=np.uint8)
+            canvas[:, :w] = frame # Copy the webcam feed to the left side
+            
+            # --- Top Banner: Activity & Direction (Now in the Sidebar) ---
+            if tracker.exercise_type == "seated_knee_extension":
+                ex_name = "SEATED KNEE EXT."
+                ex_dir = "DIR: RIGHT-SIDE FACING"
+            elif tracker.exercise_type == "shoulder_abduction":
+                ex_name = "SHOULDER ABD."
+                ex_dir = "DIR: FRONT FACING"
+            elif tracker.exercise_type == "standing_march":
+                ex_name = "STANDING MARCH"
+                ex_dir = "DIR: RIGHT-SIDE FACING"
+            else:
+                ex_name = tracker.exercise_type.upper()
+                ex_dir = "DIR: ANY"
+                
+            # Draw Sidebar Background
+            cv2.rectangle(canvas, (w, 0), (w + SIDEBAR_WIDTH, h), (30, 30, 30), -1)
+
+            # Draw Banner Background
+            cv2.rectangle(canvas, (w + 10, 10), (w + SIDEBAR_WIDTH - 10, 80), (0, 0, 0), -1)
+            cv2.putText(canvas, f"ACTIVITY: {ex_name}", (w + 20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA)
+            cv2.putText(canvas, f"{ex_dir}", (w + 20, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA)
+
+            # --- Dashboard Background ---
+            cv2.rectangle(canvas, (w + 10, 100), (w + SIDEBAR_WIDTH - 10, 310), (245, 117, 16), -1)
+            
+            if is_prep_phase:
+                cv2.putText(canvas, f"PREPARING: {int(prep_time_left)}s", (w + 20, 140), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2, cv2.LINE_AA)
+            else:
+                cv2.putText(canvas, f"TIME LEFT: {int(time_left)}s", (w + 20, 140), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+                            
+            cv2.putText(canvas, f"STATE: {stats['state']}", (w + 20, 180), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.putText(canvas, f"REPETITIONS: {stats['reps']}/{target_reps}", (w + 20, 220), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.putText(canvas, f"SCORE: {stats['score']}/{target_reps * 100}", (w + 20, 260), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+            
+            # Action Feedback Block
+            cv2.rectangle(canvas, (w + 10, 330), (w + SIDEBAR_WIDTH - 10, h - 10), (0, 0, 0), -1)
+            cv2.putText(canvas, "SYSTEM FEEDBACK:", (w + 20, 360), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
+            
+            # Wrap long feedback text
+            feedback_text = "GET INTO POSITION!" if is_prep_phase else stats['feedback']
+            cv2.putText(canvas, feedback_text, (w + 20, 400), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255) if is_prep_phase else (0, 255, 0), 2, cv2.LINE_AA)
 
         # Display the video with overlaid analytics
         cv2.imshow('Rehab AI - Kinematic Translation', canvas)
