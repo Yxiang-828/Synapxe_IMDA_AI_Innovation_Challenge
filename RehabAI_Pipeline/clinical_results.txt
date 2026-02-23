@@ -1,14 +1,14 @@
 ==============================================================
             REHAB AI - CLINICAL TRACKER REPORT                
 ==============================================================
-Date/Time: 2026-02-23 20:17:50
+Date/Time: 2026-02-23 20:33:53
 
 EXERCISE MODULE           | REPETITIONS  | SCORE MAP   
 --------------------------------------------------------------
-Seated Knee Extension     | 9/3          | 900/300     
-Shoulder Abduction        | 1/3          | 100/300     
-Standing March            | 2/3          | 200/300     
+Seated Knee Extension     | 4/3          | 400/300     
+Shoulder Abduction        | 0/3          | 0/300       
+Standing March            | 0/3          | 0/300       
 
 ==============================================================
-AGGREGATE CLINICAL SCORE  : 1200 / 900 Points
+AGGREGATE CLINICAL SCORE  : 400 / 900 Points
 ==============================================================
