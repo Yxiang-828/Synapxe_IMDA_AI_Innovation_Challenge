@@ -12,12 +12,22 @@ class ExerciseTracker:
         self.angle_window = deque(maxlen=window_size)
         
         # State Tracking
-        self.state = "IDLE"  # IDLE -> DESCENDING -> ASCENDING -> COMPLETED
+        self.state = "CALIBRATING"  # CALIBRATING -> IDLE -> DESCENDING -> ASCENDING -> COMPLETED
         self.rep_count = 0
+        self.calibration_frames = 0 # Need 30 continuous frames to unlock tracking
         
         # Scoring metrics purely based on kinematics
         self.current_score = 0
-        self.feedback = "Ready"
+        
+        # Set initial calibration instructions
+        if self.exercise_type == "seated_knee_extension":
+            self.feedback = "Sit in chair. Camera side. Feet flat."
+        elif self.exercise_type == "shoulder_abduction":
+            self.feedback = "Stand facing camera. Arms at sides."
+        elif self.exercise_type == "standing_march":
+            self.feedback = "Stand sideways. Hold a chair."
+        else:
+            self.feedback = "Calibrating posture..."
 
     def process_frame_angles(self, current_angle):
         """
@@ -43,9 +53,21 @@ class ExerciseTracker:
         """
         current_angle = self.angle_window[-1]
         
+        # --- CALIBRATION ROUTINE ---
+        if self.state == "CALIBRATING":
+            if 80 <= current_angle <= 110:
+                self.calibration_frames += 1
+                if self.calibration_frames >= 30: # Held for 1 second
+                    self.state = "IDLE"
+                    self.feedback = "Begin: Straighten your leg!" # TELL THEM WHAT TO DO
+            else:
+                self.calibration_frames = 0 # Reset if they move
+            return # Block reps until calibrated
+            
+        # --- EXECUTION STATE MACHINE ---
         if self.state == "IDLE" and current_angle > 110:
             self.state = "EXTENDING"
-            self.feedback = "Straighten your leg..."
+            self.feedback = "Straighten it out..."
             
         elif self.state == "EXTENDING" and current_angle > 165:
             # Reached full healthy extension
@@ -62,6 +84,9 @@ class ExerciseTracker:
         elif self.state == "EXTENDING" and current_angle < 130 and current_angle < self.angle_window[-5]:
             # They dropped their leg before reaching full extension
             self.feedback = "Try to straighten it fully!"
+            
+        elif self.state == "IDLE":
+             self.feedback = "Begin: Straighten your leg!"
 
     def _evaluate_shoulder_abduction(self):
         """
@@ -70,9 +95,20 @@ class ExerciseTracker:
         """
         current_angle = self.angle_window[-1]
 
+        # --- CALIBRATION ROUTINE ---
+        if self.state == "CALIBRATING":
+            if current_angle <= 25:
+                self.calibration_frames += 1
+                if self.calibration_frames >= 30:
+                    self.state = "IDLE"
+                    self.feedback = "Begin: Raise arm to side!" # TELL THEM WHAT TO DO
+            else:
+                self.calibration_frames = 0
+            return
+
         if self.state == "IDLE" and current_angle > 30:
             self.state = "RAISING"
-            self.feedback = "Raise arm to the side..."
+            self.feedback = "Push higher..."
             
         elif self.state == "RAISING" and current_angle > 150:
             # Good mobility achieved
@@ -88,6 +124,9 @@ class ExerciseTracker:
         elif self.state == "RAISING" and current_angle < 80 and current_angle < self.angle_window[-5]:
             # Dropped arm early
             self.feedback = "Push higher if you can!"
+            
+        elif self.state == "IDLE":
+             self.feedback = "Begin: Raise arm to side!"
 
     def _evaluate_standing_march(self):
         """
@@ -97,9 +136,20 @@ class ExerciseTracker:
         """
         current_angle = self.angle_window[-1]
 
+        # --- CALIBRATION ROUTINE ---
+        if self.state == "CALIBRATING":
+            if 165 <= current_angle <= 185: # Standing mostly straight
+                self.calibration_frames += 1
+                if self.calibration_frames >= 30:
+                    self.state = "IDLE"
+                    self.feedback = "Begin: March knee HIGH!" # TELL THEM WHAT TO DO
+            else:
+                self.calibration_frames = 0
+            return
+
         if self.state == "IDLE" and current_angle < 150:
             self.state = "LIFTING"
-            self.feedback = "March knee up..."
+            self.feedback = "Lift knee up..."
             
         elif self.state == "LIFTING" and current_angle < 100:
             # Knee is parallel to floor
@@ -115,6 +165,9 @@ class ExerciseTracker:
         elif self.state == "LIFTING" and current_angle > 140 and current_angle > self.angle_window[-5]:
             # Put foot down too early
             self.feedback = "Lift knee higher!"
+            
+        elif self.state == "IDLE":
+             self.feedback = "Begin: March knee HIGH!"
             
     def get_stats(self):
         return {
