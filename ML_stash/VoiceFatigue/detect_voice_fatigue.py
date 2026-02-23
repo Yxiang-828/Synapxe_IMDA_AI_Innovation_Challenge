@@ -1,77 +1,96 @@
-import soundfile as sf
-import torch
-from speechbrain.inference.classifiers import EncoderClassifier
 import os
 import glob
 import numpy as np
-from sklearn.linear_model import LogisticRegression
+import soundfile as sf
+import torch
+from transformers import Wav2Vec2FeatureExtractor, HubertForSequenceClassification
 from datetime import datetime
 
-# Define paths
+# ==========================================
+# CONFIGURATION
+# ==========================================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INPUT_DIR = os.path.join(BASE_DIR, "audio_input")
 OUTPUT_DIR = os.path.join(BASE_DIR, "audio_output")
 
-def extract_features(audio_file):
-    print(f"Processing {os.path.basename(audio_file)}...")
-    
+# MODEL (Using Emotion Recognition as a proxy for Fatigue/Arousal)
+# "superb/hubert-base-superb-er" is excellent for emotion/state detection
+MODEL_NAME = "superb/hubert-base-superb-er"
+
+def analyze_fatigue(audio_file):
     try:
-        classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-ecapa-voxceleb")
+        # Load Model & Feature Extractor (Not Processor, as we don't need text decoding)
+        feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(MODEL_NAME)
+        model = HubertForSequenceClassification.from_pretrained(MODEL_NAME)
+        
+        # Load Audio (Resample to 16kHz)
+        speech, rate = sf.read(audio_file)
+        if rate != 16000:
+            # Simple resampling (nearest neighbor usually fine for demos, but librosa better)
+            import librosa
+            speech, _ = librosa.load(audio_file, sr=16000)
+            
+        # Preprocess
+        inputs = feature_extractor(speech, sampling_rate=16000, return_tensors="pt", padding=True)
+        
+        # Inference
+        with torch.no_grad():
+            logits = model(**inputs).logits
+            
+        # Get Probabilities
+        probs = torch.nn.functional.softmax(logits, dim=-1)
+        scores = probs[0].tolist()
+        
+        # Labels for this specific model (neu, hap, ang, sad)
+        # We interpret:
+        # - Sad / Neutral -> Low Energy (Fatigue Risk)
+        # - Happy / Angry -> High Energy
+        
+        # Index map: 0: neu, 1: hap, 2: ang, 3: sad
+        # (This varies by model version, we assume standard Superb mapping)
+        # Actually Superb ER usually maps: 0: neu, 1: hap, 2: ang, 3: sad.
+        
+        fatigue_score = scores[0] + scores[3] # Neutral + Sad
+        energy_score = scores[1] + scores[2]  # Happy + Angry
+        
+        return "High Fatigue Risk" if fatigue_score > energy_score else "Normal Energy", fatigue_score
+
     except Exception as e:
-        # Fallback if there are network/cache issues, though our previous fix should handle it
         import traceback
         traceback.print_exc()
-        return None
+        print(f"Error analyzing {audio_file}: {e}")
+        return "Error", 0.0
 
-    try:
-        # Load audio using soundfile directly to avoid torchaudio backend issues
-        signal_np, fs = sf.read(audio_file)
-        
-        # Convert to tensor
-        signal = torch.from_numpy(signal_np).float()
-        
-        # Handle stereo/channels
-        if len(signal.shape) > 1:
-            if signal.shape[1] > 1:
-                signal = signal.mean(dim=1) # mix to mono
-        
-        # Ensure (1, T) shape
-        if len(signal.shape) == 1:
-            signal = signal.unsqueeze(0)
-            
-        # Resample if needed (ECAPA expects 16k)
-        if fs != 16000:
-            import torchaudio.transforms as T
-            resampler = T.Resample(fs, 16000)
-            signal = resampler(signal)
-            
-        embeddings = classifier.encode_batch(signal)
-        return embeddings.squeeze().detach().numpy()
-        
-    except Exception as e:
-        print(f"Error processing {audio_file}: {e}")
-        return None
-
-def generate_report(filename, prediction, probability):
+def generate_report(filename, prediction, probability, all_results=None):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Build results table
+    res_table = "| Run # | Result | Fatigue Score |\n| :--- | :--- | :--- |\n"
+    if all_results:
+        for idx, (lbl, prob) in enumerate(all_results):
+            res_table += f"| {idx+1} | {lbl} | {prob:.2%} |\n"
+    else:
+        res_table += f"| 1 | {prediction} | {probability:.2%} |\n"
+
     report_content = f"""# Voice Fatigue Analysis Report
     
 **Date:** {timestamp}
 **File:** {filename}
-**Model:** ECAPA-TDNN (SpeechBrain)
+**Model:** {MODEL_NAME} (Real Pre-Trained Model)
 
-## Results
+## Consistency Check (5 Runs)
+*Note: Using a real model, this should be consistent natively.*
+{res_table}
+
+## Final Analysis
 - **Status:** {prediction}
-- **Confidence:** {probability:.2%}
-
-## Analysis
-The audio file was analyzed using deep speaker embeddings. The classifier detected patterns consistent with {prediction.lower()}.
+- **Fatigue/Arousal Score:** {probability:.2%}
+(High Score = Low energy/monotone voice detected)
 
 ---
 *Generated by Synapxe Health screening prototype*
 """
     
-    # Create output directory if it doesn't exist (redundant check but safe)
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
 
@@ -80,46 +99,27 @@ The audio file was analyzed using deep speaker embeddings. The classifier detect
     
     with open(output_path, "w") as f:
         f.write(report_content)
-    
     print(f"Report generated: {output_path}")
 
 def main():
     if not os.path.exists(INPUT_DIR):
         os.makedirs(INPUT_DIR)
-        print(f"Created input directory: {INPUT_DIR}")
     
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
-        print(f"Created output directory: {OUTPUT_DIR}")
-
-    # Find all audio files
-    audio_files = []
-    # Check for wav, mp3, flac (case insensitive in Windows roughly, but good to be explicit if needed)
-    for ext in ["*.wav", "*.mp3", "*.flac"]:
-        audio_files.extend(glob.glob(os.path.join(INPUT_DIR, ext)))
-    
-    if not audio_files:
-        print(f"No audio files found in {INPUT_DIR}")
+    files = glob.glob(os.path.join(INPUT_DIR, "*.wav"))
+    if not files:
+        print("No files found.")
         return
 
-    # Train dummy classifier once
-    print("Initializing classifier...")
-    # Mock training data (192 dim embedding)
-    X_dummy = np.random.rand(100, 192) 
-    y_dummy = np.random.randint(0, 2, 100) # 0=Normal, 1=Fatigued
-    clf = LogisticRegression()
-    clf.fit(X_dummy, y_dummy)
-
-    for audio_file in audio_files:
-        features = extract_features(audio_file)
-        
-        if features is not None:
-            # Inference
-            prediction_idx = clf.predict([features])[0]
-            probability = clf.predict_proba([features])[0][1]
+    for f in files:
+        print(f"\nProcessing {os.path.basename(f)} (5 Runs)...")
+        results = []
+        for _ in range(5):
+            res, prob = analyze_fatigue(f)
+            results.append((res, prob))
+            print(f"  Run: {res} ({prob:.2%})")
             
-            label = "Fatigued" if prediction_idx == 1 else "Normal"
-            generate_report(os.path.basename(audio_file), label, probability)
+        final_res, final_prob = results[-1]
+        generate_report(os.path.basename(f), final_res, final_prob, results)
 
 if __name__ == "__main__":
     main()

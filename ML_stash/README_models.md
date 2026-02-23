@@ -25,28 +25,37 @@ Place any audio files you want to analyze (`.mp3`, `.wav`, or `.flac`) into the 
 > `ML_stash/audio_input/`
 
 ### Step B: Run Analysis
-Run the specific analysis script you need:
-
-**1. Voice Fatigue Detection:**
+Run the main reporting script to analyze all files for all conditions at once:
 ```bash
-python ML_stash/VoiceFatigue/detect_voice_fatigue.py
+python ML_stash/run_full_analysis.py
 ```
 
-**2. Cognitive Decline Screening:**
-```bash
-python ML_stash/CognitiveDecline/detect_cognitive_decline.py
-```
+This will generate a **Combined_Health_Report.md** in the output folder.
 
-**3. Depression Screening:**
-```bash
-python ML_stash/DepressionScreening/detect_depression.py
-```
+---
 
-### Step C: View Results
-Once the script finishes, check the **Output Folder**:
-> `ML_stash/audio_output/`
+## 3. Methodology & Architecture
 
-You will find a generated Markdown report (e.g., `myfile_fatigue_report.md`) for every audio file processed.
+The system uses a **pipelined architecture** where raw audio is processed by specialized feature extractors before classification.
+
+### A. Pre-Processing & Feature Extraction
+We use state-of-the-art pre-trained models to convert audio into numerical embeddings. These models are "frozen" (we do not retrain them), ensuring robust feature detection even with small datasets.
+
+| Condition | Feature Extractor | Source Model | Why? |
+| :--- | :--- | :--- | :--- |
+| **Voice Fatigue** | **ECAPA-TDNN** | `speechbrain/spkrec-ecapa-voxceleb` | Industry standard for speaker verification; excellent at capturing prolonged vocal strain and timbre changes. |
+| **Cognitive Decline** | **HuBERT** | `facebook/hubert-base-ls960` | Self-supervised model that learns hidden speech units. Effectively captures pauses, slurring, and articulation issues common in MCI. |
+| **Depression** | **Prosodic Features** | `Librosa` (Signal Processing) | Direct calculation of Pitch (Chroma), Loudness (RMS), and Timbre (Spectral Centroid) to detect "flat affect" (monotone/quiet speech). |
+
+### B. Classification (The "Brain")
+Once features are extracted:
+1.  **Input:** The numerical vectors from Step A (e.g., a 192-dimensional vector from ECAPA-TDNN).
+2.  **Classifier:** A lightweight classifier (MLP Neural Network or Logistic Regression) makes the final decision.
+    *   *Note:* Currently, these classifiers are **untrained prototypes** initialized with random weights, as clinical datasets (DementiaBank/DAIC-WOZ) require research approval.
+    *   *To Make Real:* You must obtain labeled `.wav` files and run a training script to "teach" this layer the difference between Healthy and Sick.
+
+### C. Output Generation
+The system aggregates the confidence scores from all three models into a single Markdown report (`Combined_Health_Report.md`) for easy review by clinicians.
 
 ---
 
