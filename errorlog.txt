@@ -1,28 +1,63 @@
-What the `start_rehab_ai.bat` output is telling you is exactly what we saw when running the installs by hand:
+ 1 file changed, 39 insertions(+), 7 deletions(-)
+PS C:\Users\xiang\Synapxe\Synapxe_IMDA_AI_Innovation_Challenge> cd .\RehabAI_Pipeline\
+PS C:\Users\xiang\Synapxe\Synapxe_IMDA_AI_Innovation_Challenge\RehabAI_Pipeline> .\start_rehab_ai.bat
+===================================================
+Rehab AI Pipeline - One-Shot Setup and Launch
+===================================================
+[INFO] Activating Virtual Environment...
+[INFO] Checking dependencies...
+[INFO] All dependencies are already installed.
+[INFO] AI Model found.
+[INFO] Launching Webcam Tracker...
+INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+W0000 00:00:1771849018.503879    5368 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1771849018.516295    5720 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+Starting Clinical Testing Pipeline... Press 'q' to exit early.
+W0000 00:00:1771849026.007095    5368 landmark_projection_calculator.cc:81] Using NORM_RECT without IMAGE_DIMENSIONS is only supported for the square ROI. Provide IMAGE_DIMENSIONS or use PROJECTION_MATRIX.
+[TEST COMPLETE] seated_knee_extension - Score: 900
+[STARTING NEXT TEST] shoulder_abduction...
+[TEST COMPLETE] shoulder_abduction - Score: 100
+[STARTING NEXT TEST] standing_march...
+[TEST COMPLETE] standing_march - Score: 200
+All clinical tests completed successfully!
 
-1. The **one‑shot setup** script activates the virtualenv and then runs `pip install -r requirements.txt`.
-2. During that install it immediately hits a package that doesn’t exist on PyPI:
-
-   ```
-   ERROR: Could not find a version that satisfies the requirement audioop-lts==0.2.2
-   ERROR: No matching distribution found for audioop-lts==0.2.2
-   ```
-
-   `pip` stops at that point, so it never gets around to installing the rest of the list – including **`opencv-python`/`opencv-contrib-python`**, which provide the `cv2` module.
-
-3. When the batch file then tries to launch `webcam_tracker.py` the script fails on the first import:
-
-   ```
-   import cv2
-   ModuleNotFoundError: No module named 'cv2'
-   ```
-
-   That’s simply a side‑effect of the earlier install failure; `cv2` was never installed because the requirements installation aborted.
-
-So the “issue” is not in the tracker itself, it’s in the dependencies file. You need to fix the environment before the script will run:
-
-- Remove or comment out the `audioop-lts==0.2.2` line (or otherwise make that package available from a private index).
-- Re‑run the installer (`pip install -r RehabAI_Pipeline\requirements.txt` or rerun the batch).
-- Ensure `opencv-python` (and `mediapipe` if needed) installs successfully – you can also install them manually with `pip install opencv-python mediapipe`.
-
-Once the requirements file can be installed without errors, the virtualenv will contain `cv2` and the webcam tracker will start normally.
+[EXPORT] Saving Clinical Results to: C:\Users\xiang\Synapxe\Synapxe_IMDA_AI_Innovation_Challenge\RehabAI_Pipeline\clinical_results.txt
+[EXPORT] Complete. Safe to close.
+PS C:\Users\xiang\Synapxe\Synapxe_IMDA_AI_Innovation_Challenge\RehabAI_Pipeline> cd ..
+PS C:\Users\xiang\Synapxe\Synapxe_IMDA_AI_Innovation_Challenge> git pull
+remote: Enumerating objects: 13, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (1/1), done.
+remote: Total 7 (delta 6), reused 7 (delta 6), pack-reused 0 (from 0)
+Unpacking objects: 100% (7/7), 3.57 KiB | 173.00 KiB/s, done.
+From https://github.com/Yxiang-828/Synapxe_IMDA_AI_Innovation_Challenge
+   eeaa267..b05f155  master     -> origin/master
+Updating eeaa267..b05f155
+Fast-forward
+ .../time_series_tracker.cpython-313.pyc            | Bin 4585 -> 5314 bytes
+ RehabAI_Pipeline/time_series_tracker.py            | 106 ++++++++++++---------
+ RehabAI_Pipeline/webcam_tracker.py                 | 101 +++++++++++++-------
+ 3 files changed, 130 insertions(+), 77 deletions(-)
+PS C:\Users\xiang\Synapxe\Synapxe_IMDA_AI_Innovation_Challenge> cd .\RehabAI_Pipeline\
+PS C:\Users\xiang\Synapxe\Synapxe_IMDA_AI_Innovation_Challenge\RehabAI_Pipeline> .\start_rehab_ai.bat
+===================================================
+Rehab AI Pipeline - One-Shot Setup and Launch
+===================================================
+[INFO] Activating Virtual Environment...
+[INFO] Checking dependencies...
+[INFO] All dependencies are already installed.
+[INFO] AI Model found.
+[INFO] Launching Webcam Tracker...
+INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+W0000 00:00:1771849520.036990   19252 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1771849520.049209   17676 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+Starting Clinical Testing Pipeline... Press 'q' to exit early.
+Traceback (most recent call last):
+  File "C:\Users\xiang\Synapxe\Synapxe_IMDA_AI_Innovation_Challenge\RehabAI_Pipeline\webcam_tracker.py", line 303, in <module>
+    main()
+  File "C:\Users\xiang\Synapxe\Synapxe_IMDA_AI_Innovation_Challenge\RehabAI_Pipeline\webcam_tracker.py", line 250, in main
+    cv2.imshow('Rehab AI - Kinematic Translation', canvas)
+                                                   ^^^^^^
+UnboundLocalError: cannot access local variable 'canvas' where it is not associated with a value
+[ERROR] The tracker crashed. Please read the error message above.
+Press any key to continue . . . 
