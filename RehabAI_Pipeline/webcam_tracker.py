@@ -25,6 +25,12 @@ detector = vision.PoseLandmarker.create_from_options(options)
 def main():
     cap = cv2.VideoCapture(0)
     
+    # --- PERFORMANCE OPTIMIZATION ---
+    # Downscale the webcam feed to 640x480. High-res webcams (1080p+) 
+    # severely lag the CPU MediaPipe detector without providing better kinematic data.
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    
     # Define the Clinical Test Progression & Goals
     test_queue = [
         {"name": "seated_knee_extension", "target_reps": 3}, # Shortened to 3 for quick testing
@@ -98,6 +104,12 @@ def main():
 
         # Step 1: Extract Local Keypoints Spatial Coordinates
         detection_result = detector.detect(mp_image)
+        
+        # Initialize the base UI Canvas for this frame
+        h, w, c = frame.shape
+        SIDEBAR_WIDTH = 420
+        canvas = np.zeros((h, w + SIDEBAR_WIDTH, 3), dtype=np.uint8)
+        canvas[:, :w] = frame # Always map the webcam to the left
 
         # Step 2: Kinematic Translation
         if len(detection_result.pose_landmarks) > 0:
@@ -181,11 +193,6 @@ def main():
                 cv2.putText(frame, str(int(angle_val)), px, cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
                         
             # --- UI Dashboard (Moved to Right Sidebar) ---
-            SIDEBAR_WIDTH = 420
-            
-            # Create a larger canvas: webcam frame on the left, black sidebar on the right
-            canvas = np.zeros((h, w + SIDEBAR_WIDTH, 3), dtype=np.uint8)
-            canvas[:, :w] = frame # Copy the webcam feed to the left side
             
             # --- Top Banner: Activity & Direction (Now in the Sidebar) ---
             if tracker.exercise_type == "seated_knee_extension":
