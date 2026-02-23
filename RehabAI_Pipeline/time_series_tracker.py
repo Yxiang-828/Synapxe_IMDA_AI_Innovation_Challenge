@@ -11,11 +11,11 @@ class ExerciseTracker:
         self.current_score = 0
         
         if self.exercise_type == "seated_knee_extension":
-            self.feedback = "Ready. Straighten your leg."
+            self.feedback = "Face right side. Straighten your leg."
         elif self.exercise_type == "shoulder_abduction":
-            self.feedback = "Ready. Raise arm to the side."
+            self.feedback = "Face front. Raise arm to the side."
         elif self.exercise_type == "standing_march":
-            self.feedback = "Ready. March your knee up."
+            self.feedback = "Face right side. March your knee up."
         else:
             self.feedback = "Ready. Begin!"
 

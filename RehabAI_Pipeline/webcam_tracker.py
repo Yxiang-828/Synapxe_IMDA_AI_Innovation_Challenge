@@ -104,21 +104,15 @@ def main():
             pose_landmarks = detection_result.pose_landmarks[0] # Get the first person detected
             
             if tracker.exercise_type == "seated_knee_extension":
-                # LEFT LEG
-                l_hip = [pose_landmarks[23].x, pose_landmarks[23].y]
-                l_knee = [pose_landmarks[25].x, pose_landmarks[25].y]
-                l_ankle = [pose_landmarks[27].x, pose_landmarks[27].y]
-                l_angle = calculate_angle(l_hip, l_knee, l_ankle)
-                
-                # RIGHT LEG
+                # ONLY USE RIGHT LEG (Left leg is occluded from the side)
                 r_hip = [pose_landmarks[24].x, pose_landmarks[24].y]
                 r_knee = [pose_landmarks[26].x, pose_landmarks[26].y]
                 r_ankle = [pose_landmarks[28].x, pose_landmarks[28].y]
                 r_angle = calculate_angle(r_hip, r_knee, r_ankle)
                 
-                avg_angle = (l_angle + r_angle) / 2.0
-                joints_to_draw = [l_hip, l_knee, l_ankle, r_hip, r_knee, r_ankle]
-                text_positions = [(l_angle, l_knee), (r_angle, r_knee)]
+                avg_angle = r_angle # Isolated to visible leg
+                joints_to_draw = [r_hip, r_knee, r_ankle]
+                text_positions = [(r_angle, r_knee)]
                 
             elif tracker.exercise_type == "shoulder_abduction":
                 # LEFT ARM (Hip-Shoulder-Elbow)
@@ -133,26 +127,21 @@ def main():
                 r_elbow = [pose_landmarks[14].x, pose_landmarks[14].y]
                 r_angle = calculate_angle(r_hip, r_shoulder, r_elbow)
                 
-                avg_angle = (l_angle + r_angle) / 2.0
+                # Use the maximum angle achieved by either arm
+                avg_angle = max(l_angle, r_angle) 
                 joints_to_draw = [l_hip, l_shoulder, l_elbow, r_hip, r_shoulder, r_elbow]
                 text_positions = [(l_angle, l_shoulder), (r_angle, r_shoulder)]
                 
             elif tracker.exercise_type == "standing_march":
-                # LEFT LEG (Shoulder-Hip-Knee)
-                l_shoulder = [pose_landmarks[11].x, pose_landmarks[11].y]
-                l_hip = [pose_landmarks[23].x, pose_landmarks[23].y]
-                l_knee = [pose_landmarks[25].x, pose_landmarks[25].y]
-                l_angle = calculate_angle(l_shoulder, l_hip, l_knee)
-                
-                # RIGHT LEG
+                # ONLY USE RIGHT LEG (Left leg is occluded from the side)
                 r_shoulder = [pose_landmarks[12].x, pose_landmarks[12].y]
                 r_hip = [pose_landmarks[24].x, pose_landmarks[24].y]
                 r_knee = [pose_landmarks[26].x, pose_landmarks[26].y]
                 r_angle = calculate_angle(r_shoulder, r_hip, r_knee)
                 
-                avg_angle = (l_angle + r_angle) / 2.0
-                joints_to_draw = [l_shoulder, l_hip, l_knee, r_shoulder, r_hip, r_knee]
-                text_positions = [(l_angle, l_hip), (r_angle, r_hip)]
+                avg_angle = r_angle # Isolated to visible leg
+                joints_to_draw = [r_shoulder, r_hip, r_knee]
+                text_positions = [(r_angle, r_hip)]
                 
                 # --- SAFETY CHECK: Wrist Velocity ---
                 # Grab current wrists
@@ -201,13 +190,13 @@ def main():
             # --- Top Banner: Activity & Direction (Now in the Sidebar) ---
             if tracker.exercise_type == "seated_knee_extension":
                 ex_name = "SEATED KNEE EXT."
-                ex_dir = "DIR: SIDE FACING"
+                ex_dir = "DIR: RIGHT-SIDE FACING"
             elif tracker.exercise_type == "shoulder_abduction":
                 ex_name = "SHOULDER ABD."
                 ex_dir = "DIR: FRONT FACING"
             elif tracker.exercise_type == "standing_march":
                 ex_name = "STANDING MARCH"
-                ex_dir = "DIR: SIDE FACING"
+                ex_dir = "DIR: RIGHT-SIDE FACING"
             else:
                 ex_name = tracker.exercise_type.upper()
                 ex_dir = "DIR: ANY"
