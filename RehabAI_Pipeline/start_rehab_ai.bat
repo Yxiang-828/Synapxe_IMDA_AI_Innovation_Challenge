@@ -12,18 +12,20 @@ if not exist ".venv\Scripts\activate.bat" (
         pause
         exit /b
     )
-    
-    echo [INFO] Activating Virtual Environment...
-    call .venv\Scripts\activate.bat
-    
-    echo [INFO] Installing Required Dependencies...
-    pip install opencv-python numpy mediapipe==0.10.32
-    
-    echo [INFO] Setup Complete!
-    echo ===================================================
+)
+
+echo [INFO] Activating Virtual Environment...
+call .venv\Scripts\activate.bat
+
+echo [INFO] Checking dependencies...
+REM We use python -c to check if the modules are installed. 
+REM If they fail to import, errorlevel is 1, so we trigger pip install.
+python -c "import cv2, numpy, mediapipe" >nul 2>&1
+if errorlevel 1 (
+    echo [INFO] Dependencies missing. Installing Required Dependencies from requirements.txt...
+    pip install -r requirements.txt
 ) else (
-    echo [INFO] Virtual environment found. Activating...
-    call .venv\Scripts\activate.bat
+    echo [INFO] All dependencies are already installed.
 )
 
 REM 2. Launch the Application
