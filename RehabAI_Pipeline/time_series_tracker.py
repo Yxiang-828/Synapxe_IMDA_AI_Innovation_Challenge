@@ -29,39 +29,92 @@ class ExerciseTracker:
         if len(self.angle_window) < self.angle_window.maxlen:
             return
 
-        self._evaluate_squat()
+        if self.exercise_type == "seated_knee_extension":
+            self._evaluate_knee_extension()
+        elif self.exercise_type == "shoulder_abduction":
+            self._evaluate_shoulder_abduction()
+        elif self.exercise_type == "standing_march":
+            self._evaluate_standing_march()
 
-    def _evaluate_squat(self):
+    def _evaluate_knee_extension(self):
         """
-        A heuristic-based evaluation simulating what an LSTM does:
-        Analyzing the continuous pattern of the knee angle.
-        
-        Standing straight -> Knee angle ~170-180 degrees
-        Deep squat -> Knee angle ~70-90 degrees
+        Track: Hip-Knee-Ankle
+        IDLE (~90 deg) -> EXTENDING -> PEAK (~170+ deg) -> IDLE
         """
         current_angle = self.angle_window[-1]
         
-        # 1. State Machine Translation
-        if self.state == "IDLE" and current_angle < 150:
-            self.state = "DESCENDING"
-            self.feedback = "Going down..."
+        if self.state == "IDLE" and current_angle > 110:
+            self.state = "EXTENDING"
+            self.feedback = "Straighten your leg..."
             
-        elif self.state == "DESCENDING" and current_angle < 90:
-            # They hit the perfect depth
-            self.state = "BOTTOM"
-            self.feedback = "Good depth! Push up!"
+        elif self.state == "EXTENDING" and current_angle > 165:
+            # Reached full healthy extension
+            self.state = "PEAK"
+            self.feedback = "Hold it! Now lower slowly."
             
-        elif self.state == "BOTTOM" and current_angle > 160:
-            # They returned to standing
+        elif self.state == "PEAK" and current_angle < 100:
+            # Returned to resting seated position
             self.state = "IDLE"
             self.rep_count += 1
-            self.current_score += 100 # Perfect rep
-            self.feedback = "Excellent rep!"
+            self.current_score += 100
+            self.feedback = f"Good extension! ({self.rep_count}/10)"
             
-        elif self.state == "DESCENDING" and current_angle > 140 and current_angle > self.angle_window[-5]:
-            # They started standing up without hitting the 90-degree depth mark
-            # (Checking window[-5] sees if the angle is increasing over the last 5 frames)
-            self.feedback = "Go deeper!"
+        elif self.state == "EXTENDING" and current_angle < 130 and current_angle < self.angle_window[-5]:
+            # They dropped their leg before reaching full extension
+            self.feedback = "Try to straighten it fully!"
+
+    def _evaluate_shoulder_abduction(self):
+        """
+        Track: Hip-Shoulder-Elbow
+        IDLE (~10 deg) -> RAISING -> PEAK (~160+ deg) -> IDLE
+        """
+        current_angle = self.angle_window[-1]
+
+        if self.state == "IDLE" and current_angle > 30:
+            self.state = "RAISING"
+            self.feedback = "Raise arm to the side..."
+            
+        elif self.state == "RAISING" and current_angle > 150:
+            # Good mobility achieved
+            self.state = "PEAK"
+            self.feedback = "Great height! Lower slowly."
+            
+        elif self.state == "PEAK" and current_angle < 40:
+            self.state = "IDLE"
+            self.rep_count += 1
+            self.current_score += 100
+            self.feedback = f"Good raise! ({self.rep_count}/5)"
+            
+        elif self.state == "RAISING" and current_angle < 80 and current_angle < self.angle_window[-5]:
+            # Dropped arm early
+            self.feedback = "Push higher if you can!"
+
+    def _evaluate_standing_march(self):
+        """
+        Track: Shoulder-Hip-Knee
+        IDLE (~170 deg) -> LIFTING -> PEAK (< 100 deg) -> IDLE
+        NOTE: Safety logic (Wrist velocity) is injected directly in webcam_tracker before this is called.
+        """
+        current_angle = self.angle_window[-1]
+
+        if self.state == "IDLE" and current_angle < 150:
+            self.state = "LIFTING"
+            self.feedback = "March knee up..."
+            
+        elif self.state == "LIFTING" and current_angle < 100:
+            # Knee is parallel to floor
+            self.state = "PEAK"
+            self.feedback = "Hold balance! Lower slowly."
+            
+        elif self.state == "PEAK" and current_angle > 160:
+            self.state = "IDLE"
+            self.rep_count += 1
+            self.current_score += 100
+            self.feedback = f"Good march! ({self.rep_count}/10)"
+            
+        elif self.state == "LIFTING" and current_angle > 140 and current_angle > self.angle_window[-5]:
+            # Put foot down too early
+            self.feedback = "Lift knee higher!"
             
     def get_stats(self):
         return {
