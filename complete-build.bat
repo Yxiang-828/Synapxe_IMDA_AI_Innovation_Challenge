@@ -1,17 +1,28 @@
 @echo off
 setlocal
 
-REM Ensure we start from the script's directory
-cd /d "%~dp0"
+echo ==========================================
+echo  Building completely MERaLiON Hackathon App
+echo ==========================================
 
-echo ==========================================
-echo  Building MERaLiON Health Prototype
-echo ==========================================
+REM --- 0. FFmpeg System Check ---
+echo.
+echo [0/2] Checking System Dependencies (FFmpeg)...
+where ffmpeg >nul 2>nul
+if %ERRORLEVEL% neq 0 (
+    echo FFmpeg not found on system! Installing globally via winget...
+    winget install -e --id Gyan.FFmpeg
+    echo.
+    echo PLEASE RESTART YOUR TERMINAL AFTER INSTALLATION TO REFRESH PATH!       
+    echo.
+) else (
+    echo FFmpeg is already installed.
+)
 
 REM --- 1. Backend Setup ---
 echo.
 echo [1/2] Setting up Backend (Python)...
-
+cd /d "%~dp0"
 if not exist "App Part\backend\.venv" (
     echo Creating virtual environment for backend...
     python -m venv "App Part\backend\.venv"
@@ -28,20 +39,17 @@ if exist "App Part\backend\.venv\Scripts\activate.bat" (
 )
 
 echo Installing backend dependencies...
+python -m pip install --upgrade pip
 pip install -r "App Part\backend\requirements.txt"
-
-REM Optional: Install ML dependencies if user wants to run offline models later
-REM pip install -r "ML_stash\requirements.txt"
-
+pip install python-telegram-bot httpx uvicorn fastapi
 echo Backend setup complete.
-REM Only deactivate if we are in a venv we activated (though call activate puts us in subshell if no setlocal? No, call runs in same shell)
-REM deactivate simply clears env vars added by activate.
+deactivate
 
 REM --- 2. Frontend Setup ---
 echo.
 echo [2/2] Setting up Frontend (Next.js)...
 
-cd "App Part\frontend"
+cd /d "%~dp0\App Part\frontend"
 if not exist "node_modules" (
     echo Installing frontend dependencies - this may take a while...
     call npm install
@@ -53,7 +61,8 @@ if not exist "node_modules" (
 echo.
 echo ==========================================
 echo  Build Complete!
-echo  To run the app, simply execute 'run_app.bat'
+echo  Please review the instructions for ngrok/cloudflared if sharing.
+echo  To run the app everywhere, simply execute 'run.bat'
 echo ==========================================
 
 pause

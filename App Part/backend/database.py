@@ -28,25 +28,67 @@ def init_db():
             timestamp TIMESTAMP
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chat_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            telegram_id TEXT,
+            role TEXT, -- "user" or "assistant"
+            message TEXT,
+            timestamp TIMESTAMP
+        )
+    ''')
+    
+    # Run migrations to add interval settings if they are missing
+    try:
+        cursor.execute("ALTER TABLE patients ADD COLUMN interval_minutes INTEGER DEFAULT 1440")
+    except sqlite3.OperationalError:
+        pass # Column exists
+        
+    try:
+        cursor.execute("ALTER TABLE patients ADD COLUMN last_prompted TIMESTAMP")
+    except sqlite3.OperationalError:
+        pass # Column exists
+
     conn.commit()
     conn.close()
 
 def get_or_create_patient(telegram_id: str, name: str):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, fatigue_score, mobility_score FROM patients WHERE telegram_id = ?", (telegram_id,))
+    cursor.execute("SELECT id, fatigue_score, mobility_score, interval_minutes FROM patients WHERE telegram_id = ?", (telegram_id,))
     row = cursor.fetchone()
     
     if not row:
+        now_str = datetime.now().isoformat()
         cursor.execute(
-            "INSERT INTO patients (telegram_id, name, last_interaction) VALUES (?, ?, ?)",
-            (telegram_id, name, datetime.now().isoformat())
+            "INSERT INTO patients (telegram_id, name, last_interaction, last_prompted, interval_minutes) VALUES (?, ?, ?, ?, ?)",
+            (telegram_id, name, now_str, now_str, 1440) # default interval 24 hours
         )
         conn.commit()
-        row = (cursor.lastrowid, 0.0, 0.0)
+        row = (cursor.lastrowid, 0.0, 0.0, 1440)
     
     conn.close()
-    return {"id": row[0], "fatigue_score": row[1], "mobility_score": row[2]}
+    return {"id": row[0], "fatigue_score": row[1], "mobility_score": row[2], "interval_minutes": row[3]}
+
+def update_patient_interval(telegram_id: str, interval_minutes: int):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE patients SET interval_minutes = ? WHERE telegram_id = ?",
+        (interval_minutes, telegram_id)
+    )
+    conn.commit()
+    conn.close()
+
+def update_last_prompted(telegram_id: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE patients SET last_prompted = ? WHERE telegram_id = ?",
+        (datetime.now().isoformat(), telegram_id)
+    )
+    conn.commit()
+    conn.close()
 
 def log_interaction(telegram_id: str, interaction_type: str, score_delta: float, note: str):
     conn = sqlite3.connect(DB_PATH)
@@ -59,3 +101,33 @@ def log_interaction(telegram_id: str, interaction_type: str, score_delta: float,
     cursor.execute("UPDATE patients SET last_interaction = ? WHERE telegram_id = ?", (datetime.now().isoformat(), telegram_id))
     conn.commit()
     conn.close()
+
+def log_chat_message(telegram_id: str, role: str, message: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO chat_history (telegram_id, role, message, timestamp) VALUES (?, ?, ?, ?)",
+        (telegram_id, role, message, datetime.now().isoformat())
+    )
+    conn.commit()
+    conn.close()
+
+def get_recent_history(telegram_id: str, limit: int = 6) -> str:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT role, message FROM chat_history WHERE telegram_id = ? ORDER BY timestamp DESC LIMIT ?",
+        (telegram_id, limit)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    
+    if not rows:
+        return "No recent history."
+        
+    # Reverse to chronological order
+    history = []
+    for role, msg in reversed(rows):
+        history.append(f"{role.capitalize()}: {msg}")
+        
+    return "\n".join(history)

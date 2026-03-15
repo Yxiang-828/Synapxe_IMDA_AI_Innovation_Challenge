@@ -1,0 +1,376 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
+
+type Point = { x: number; y: number };
+
+function calculateAngle(a: Point, b: Point, c: Point): number {
+    const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+    let angle = Math.abs((radians * 180.0) / Math.PI);
+    if (angle > 180.0) {
+        angle = 360.0 - angle;
+    }
+    return angle;
+}
+
+const EXERCISES = [
+    { id: "seated_knee_extension", name: "Right Knee Extension", targetReps: 3, feedback_idle: "Face right side. Straighten your leg." },
+    { id: "shoulder_abduction", name: "Shoulder Abduction", targetReps: 3, feedback_idle: "Face front. Raise arm to the side." },
+    { id: "standing_march", name: "Standing March", targetReps: 3, feedback_idle: "Face right side. March your knee up." }
+];
+
+export default function MobilityGame() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [status, setStatus] = useState("Loading AI Model...");
+  const [feedback, setFeedback] = useState("Get Ready!");
+  
+  const [currentTestIdx, setCurrentTestIdx] = useState(0);
+  const [reps, setReps] = useState(0);
+  
+  const isPlaying = useRef(false);
+  const isEnded = useRef(false);
+  const animationRef = useRef<number>(0);
+  const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
+
+  // FSM State refs (to avoid excessive re-renders)
+  const fsmState = useRef("IDLE");
+  const angleWindow = useRef<number[]>([]);
+  const currentReps = useRef(0);
+  const currentTestIndexRef = useRef(0);
+  const gameStats = useRef<any>({});
+
+  const initMediaPipe = async () => {
+    try {
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+      );
+      const landmarker = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+          delegate: "GPU"
+        },
+        outputSegmentationMasks: false,
+        runningMode: "VIDEO",
+        numPoses: 1
+      });
+      poseLandmarkerRef.current = landmarker;
+      startCamera();
+    } catch (err) {
+      console.error(err);
+      setStatus("Failed to load Pose AI.");
+    }
+  };
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 1280, height: 720, facingMode: "user" }
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          isPlaying.current = true;
+          setStatus("Active");
+          setFeedback(EXERCISES[0].feedback_idle);
+          predict();
+        };
+      }
+    } catch (err) {
+      setStatus("Camera Access Denied");
+    }
+  };
+
+  const drawSkeletons = (ctx: CanvasRenderingContext2D, landmarks: any, width: number, height: number) => {
+    ctx.clearRect(0, 0, width, height);
+
+    // Filter to major joints (we don't need facial landmarks drawn except maybe nose for orientation)
+    // Draw edges
+    const connections = PoseLandmarker.POSE_CONNECTIONS;
+    ctx.strokeStyle = "#10b981"; // Emerald-500
+    ctx.lineWidth = 4;
+    connections.forEach((conn) => {
+        const start = landmarks[conn.start];
+        const end = landmarks[conn.end];
+        
+        // Pose connections use 0.0 to 1.0 normalized coordinates
+        if (start.visibility > 0.5 && end.visibility > 0.5) {
+            ctx.beginPath();
+            ctx.moveTo(start.x * width, start.y * height);
+            ctx.lineTo(end.x * width, end.y * height);
+            ctx.stroke();
+        }
+    });
+
+    // Draw nodes
+    ctx.fillStyle = "#ffffff";
+    landmarks.forEach((p: any, idx: number) => {
+        if (p.visibility > 0.5 && idx > 10) { // Only body parts mostly
+            ctx.beginPath();
+            ctx.arc(p.x * width, p.y * height, 6, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+    });
+  };
+
+  const nextTest = () => {
+    fsmState.current = "IDLE";
+    angleWindow.current = [];
+    currentReps.current = 0;
+    
+    if (currentTestIndexRef.current + 1 < EXERCISES.length) {
+        currentTestIndexRef.current += 1;
+        setCurrentTestIdx(currentTestIndexRef.current);
+        setReps(0);
+        setFeedback(EXERCISES[currentTestIndexRef.current].feedback_idle);
+    } else {
+        endGame();
+    }
+  };
+
+  const processAngles = (landmarks: any[]) => {
+      const idx = currentTestIndexRef.current;
+      if (idx >= EXERCISES.length) return;
+      const ex = EXERCISES[idx];
+
+      let angle = 0;
+
+      if (ex.id === "seated_knee_extension") {
+          // Right leg: 24, 26, 28 (Hip, Knee, Ankle)
+          // Due to mirror (-scale-x-100), actually 'right' leg of user aligns with Right landmarks in MediaPipe if facing standard camera.
+          // MediaPipe 24=RightHip, 26=RightKnee, 28=RightAnkle
+          if (landmarks[24].visibility > 0.4 && landmarks[26].visibility > 0.4 && landmarks[28].visibility > 0.4) {
+              angle = calculateAngle(landmarks[24], landmarks[26], landmarks[28]);
+          } else {
+              return; // skeleton not visible
+          }
+
+          angleWindow.current.push(angle);
+          if (angleWindow.current.length > 30) angleWindow.current.shift();
+          if (angleWindow.current.length < 5) return;
+
+          const current_angle = angleWindow.current[angleWindow.current.length - 1];
+          const past_angle = angleWindow.current[angleWindow.current.length - 5];
+
+          if (fsmState.current === "IDLE" && current_angle > 110) {
+              fsmState.current = "EXTENDING";
+              setFeedback("Keep straightening! Push higher.");
+          } else if (fsmState.current === "EXTENDING") {
+              if (current_angle > 165) {
+                  fsmState.current = "PEAK";
+                  setFeedback("Hold it! Perfect. Now lower slowly.");
+              } else if (current_angle < 130 && current_angle < past_angle - 2) {
+                  setFeedback("You dropped it early! Straighten fully.");
+              }
+          } else if (fsmState.current === "PEAK" && current_angle < 100) {
+              fsmState.current = "IDLE";
+              currentReps.current += 1;
+              setReps(currentReps.current);
+              setFeedback(`Good rep! [${currentReps.current}] Go again.`);
+              if (currentReps.current >= ex.targetReps) nextTest();
+          }
+
+      } else if (ex.id === "shoulder_abduction") {
+          // Right Arm (12, 14, 16) or Left Arm (11, 13, 15) vs Hip (24, 23)
+          // We will use LEFT arm of mediapipe (11, 13, 15) to calculate since it doesn't matter which side for symmetric.
+          if (landmarks[23].visibility > 0.4 && landmarks[11].visibility > 0.4 && landmarks[13].visibility > 0.4) {
+             angle = calculateAngle(landmarks[23], landmarks[11], landmarks[13]);
+          } else {
+             return;
+          }
+
+          angleWindow.current.push(angle);
+          if (angleWindow.current.length > 30) angleWindow.current.shift();
+          if (angleWindow.current.length < 5) return;
+
+          const current_angle = angleWindow.current[angleWindow.current.length - 1];
+          const past_angle = angleWindow.current[angleWindow.current.length - 5];
+
+          if (fsmState.current === "IDLE" && current_angle > 40) {
+              fsmState.current = "RAISING";
+              setFeedback("Keep raising! Reach for the sky.");
+          } else if (fsmState.current === "RAISING") {
+              if (current_angle > 150) {
+                  fsmState.current = "PEAK";
+                  setFeedback("Excellent height! Lower arm slowly.");
+              } else if (current_angle < 80 && current_angle < past_angle - 2) {
+                  setFeedback("Try to push higher next time!");
+              }
+          } else if (fsmState.current === "PEAK" && current_angle < 40) {
+              fsmState.current = "IDLE";
+              currentReps.current += 1;
+              setReps(currentReps.current);
+              setFeedback(`Great form! [${currentReps.current}] Raise again.`);
+              if (currentReps.current >= ex.targetReps) nextTest();
+          }
+
+      } else if (ex.id === "standing_march") {
+          // 12=Shoulder, 24=Hip, 26=Knee
+          if (landmarks[12].visibility > 0.4 && landmarks[24].visibility > 0.4 && landmarks[26].visibility > 0.4) {
+              angle = calculateAngle(landmarks[12], landmarks[24], landmarks[26]);
+          } else {
+              return;
+          }
+          
+          angleWindow.current.push(angle);
+          if (angleWindow.current.length > 30) angleWindow.current.shift();
+          if (angleWindow.current.length < 5) return;
+
+          const current_angle = angleWindow.current[angleWindow.current.length - 1];
+          const past_angle = angleWindow.current[angleWindow.current.length - 5];
+
+          if (fsmState.current === "IDLE" && current_angle < 150) {
+              fsmState.current = "LIFTING";
+              setFeedback("Keep lifting! Knee higher.");
+          } else if (fsmState.current === "LIFTING") {
+              if (current_angle < 100) {
+                  fsmState.current = "PEAK";
+                  setFeedback("Hold balance! Lower leg slowly.");
+              } else if (current_angle > 140 && current_angle > past_angle + 2) {
+                  setFeedback("Foot down too early! Lift higher.");
+              }
+          } else if (fsmState.current === "PEAK" && current_angle > 160) {
+              fsmState.current = "IDLE";
+              currentReps.current += 1;
+              setReps(currentReps.current);
+              setFeedback(`Solid march! [${currentReps.current}] Knee up again.`);
+              if (currentReps.current >= ex.targetReps) nextTest();
+          }
+      }
+  }
+
+  const predict = () => {
+    if (!isPlaying.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    
+    if (video && canvas && video.readyState >= 2 && poseLandmarkerRef.current) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        let startTimeMs = performance.now();
+        const results = poseLandmarkerRef.current.detectForVideo(video, startTimeMs);
+
+        if (results.landmarks && results.landmarks[0]) {
+            drawSkeletons(ctx, results.landmarks[0], canvas.width, canvas.height);
+            processAngles(results.landmarks[0]);
+        } else {
+            ctx.clearRect(0,0, canvas.width, canvas.height);
+        }
+      }
+    }
+    
+    if (!isEnded.current) {
+      animationRef.current = requestAnimationFrame(predict);
+    }
+  };
+
+  const endGame = async () => {
+    if (isEnded.current) return;
+    isEnded.current = true;
+    isPlaying.current = false;
+    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+    }
+
+    setStatus("Test Complete! Sending Results...");
+
+    const tg = (window as any).Telegram?.WebApp;
+    let uid = tg?.initDataUnsafe?.user?.id;
+    if (!uid) {
+      const p = new URLSearchParams(window.location.search);
+      uid = p.get('uid');
+    }
+
+    // Prepare score string based on target reps achieved
+    // E.g. user finished all tests successfully, scored 9 out of 9 total
+    let totalReps = EXERCISES.reduce((sum, ex) => sum + ex.targetReps, 0);
+
+    if (uid) {
+        try {
+          await fetch('/api/score', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telegram_id: String(uid),
+              game_type: 'mobility_score',
+              score: totalReps,
+              metrics: {"tests_completed": EXERCISES.length}
+            })
+          });
+        } catch (err) {
+            console.error("Failed to POST score", err);
+        }
+    }
+
+    if (tg) {
+      setTimeout(() => tg.close(), 1500);
+    } else {
+      setStatus("Done! Please close window.");
+    }
+  };
+
+  useEffect(() => {
+    initMediaPipe();
+    return () => {
+      isPlaying.current = false;
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      if (videoRef.current?.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  const curEx = EXERCISES[currentTestIdx] || EXERCISES[0];
+
+  return (
+    <div className="flex-1 flex flex-col items-center max-h-full bg-gray-900 relative">
+      <div className="absolute top-4 left-4 z-10 bg-black/60 rounded-xl p-2 text-white font-mono text-sm shadow-xl">
+        {curEx.name}
+      </div>
+      
+      {!isEnded.current && (
+        <div className="absolute top-4 right-4 z-10 bg-black/60 rounded-xl p-2 text-white font-mono text-sm shadow-xl">
+          Reps: {reps} / {curEx.targetReps}
+        </div>
+      )}
+
+      {/* Video element - hidden behind canvas visually, but handles stream */}
+      <video
+        ref={videoRef}
+        className="absolute inset-0 w-full h-full object-cover -scale-x-100" // Mirrors the local video
+        autoPlay
+        playsInline
+        muted
+      />
+      {/* Canvas for drawing the tracking lines */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full object-cover -scale-x-100 z-0 pointer-events-none"
+      />
+
+      {/* Overlay Status Bar */}
+      <div className="absolute bottom-10 left-4 right-4 z-20">
+        <div className="bg-emerald-600/90 backdrop-blur-md rounded-2xl p-4 shadow-2xl text-center border-2 border-emerald-400">
+           <h2 className="text-xl font-bold text-white mb-1">{status}</h2>
+           {!isEnded.current ? (
+             <p className="text-emerald-100 text-sm font-medium animate-pulse">
+               {feedback}
+             </p>
+           ) : (
+             <p className="text-emerald-100 text-sm font-medium">
+                Analysis complete. Sending telemetry to Health Buddy.
+             </p>
+           )}
+        </div>
+      </div>
+    </div>
+  );
+}

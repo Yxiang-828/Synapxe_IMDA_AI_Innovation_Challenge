@@ -1,0 +1,9 @@
+Helper_Tools/
+reference/
+
+node_modules/
+.env
+__pycache__/
+*.log
+.venv/
+.DS_Store

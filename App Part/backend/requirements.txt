@@ -2,5 +2,10 @@ fastapi
 uvicorn
 pydantic
 python-multipart
-python-telegram-bot
+python-telegram-bot[job-queue]
 httpx
+transformers
+torch
+torchaudio
+soundfile
+librosa
