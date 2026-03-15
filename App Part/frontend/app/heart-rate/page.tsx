@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useVoice } from '../../hooks/useVoice';
 
 // ─── Signal Processing Helpers ────────────────────────────────────────────────
 
@@ -67,10 +68,18 @@ export default function HeartRatePage() {
   const samplesRef = useRef<number[]>([]);
   const startTimeRef = useRef<number>(0);
   const phaseRef = useRef<Phase>('idle');
+  const { speak } = useVoice();
 
   useEffect(() => {
     phaseRef.current = phase;
-  }, [phase]);
+    if (phase === 'preparing') {
+        speak("Hold still, keep calm");
+    } else if (phase === 'measuring') {
+        // optionally remind them mid-way
+    } else if (phase === 'result') {
+        speak("Measurement complete");
+    }
+  }, [phase, speak]);
 
   const setTorch = useCallback(async (on: boolean) => {
     if (!trackRef.current) return;

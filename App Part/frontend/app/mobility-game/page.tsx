@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
+import { useVoice } from '../../hooks/useVoice';
 
 type Point = { x: number; y: number };
 
@@ -25,6 +26,14 @@ export default function MobilityGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [status, setStatus] = useState("Loading AI Model...");
   const [feedback, setFeedback] = useState("Get Ready!");
+  const { speak } = useVoice();
+
+  // Watch for feedback changes and speak them!
+  useEffect(() => {
+    if (feedback && feedback !== "Loading AI Model...") {
+      speak(feedback);
+    }
+  }, [feedback, speak]);
 
   const [currentTestIdx, setCurrentTestIdx] = useState(0);
   const [reps, setReps] = useState(0);

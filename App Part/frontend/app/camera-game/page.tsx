@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
+import { useVoice } from '../../hooks/useVoice';
 
 export default function CameraGame() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -8,6 +9,8 @@ export default function CameraGame() {
   const [status, setStatus] = useState("Loading AI Model...");
   const [score, setScore] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(10);
+  const { speak } = useVoice();
+  
   const isPlaying = useRef(false);
   const isEnded = useRef(false);
   const animationRef = useRef<number>(0);
@@ -44,10 +47,18 @@ export default function CameraGame() {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadeddata = () => {
           setStatus("Smile as wide as you can!");
+          speak("Smile as wide as you can!");
           isPlaying.current = true;
           // Start game timer
           const timer = setInterval(() => {
             setTimeRemaining((prev) => {
+              if (prev === 5) {
+                  speak("Keep smiling, don't relax!");
+              } else if (prev <= 4 && prev > 1) {
+                  // Count down when close (optional)
+                  // speak(prev.toString());
+              }
+
               if (prev <= 1) {
                 clearInterval(timer);
                 endGame();
