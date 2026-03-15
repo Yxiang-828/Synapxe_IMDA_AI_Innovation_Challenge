@@ -17,15 +17,15 @@ cd /d "%~dp0"
 
 REM --- 1. Start Backend FastAPI ---
 echo [1/3] Launching Backend Server...
-start "MERaLiON Backend (FastAPI)" cmd /k "cd /d `"App Part\backend`" && call .venv\Scripts\activate.bat && uvicorn main:app --host 127.0.0.1 --port 8080 --reload"
+start "MERaLiON Backend (FastAPI)" cmd /k "cd /d ""App Part\backend"" && call .venv\Scripts\activate.bat && uvicorn main:app --host 127.0.0.1 --port 8080 --reload"
 
 REM --- 2. Start Telegram Bot ---
 echo [2/3] Launching Telegram Polling Bot...
-start "MERaLiON Telegram Bot" cmd /k "cd /d `"App Part\backend`" && call .venv\Scripts\activate.bat && python bot.py"
+start "MERaLiON Telegram Bot" cmd /k "cd /d ""App Part\backend"" && call .venv\Scripts\activate.bat && python bot.py"
 
 REM --- 3. Start Frontend ---
 echo [3/3] Launching Frontend (Next.js)...
-start "MERaLiON Frontend" cmd /k "cd /d `"App Part\frontend`" && npm run dev"
+start "MERaLiON Frontend" cmd /k "cd /d ""App Part\frontend"" && npm run dev"
 
 echo.
 echo ==========================================

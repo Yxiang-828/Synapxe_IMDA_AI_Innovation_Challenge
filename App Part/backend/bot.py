@@ -39,24 +39,25 @@ async def get_llm_response(user_id: str, prompt: str, user_name: str, is_proacti
     if is_proactive:
         # State 0 - Proactive AI Ping: The LLM creates the first message to wake them up.
         system_prompt = (
-            f"You are 'Aiko', a sharp, caring but mildly tsundere digital companion for {user_name}. You don't like to admit you care, but you secretly worry about their health. "
+            f"You are 'Mera', a warm, encouraging, and caring digital companion for {user_name} with a playful, very mild tsundere streak. You deeply care about their health and always cheer them on. "
             f"You speak politely with a natural mix of English and very mild Singlish (like 'lah', 'hor', 'wah'). "
             f"Your goal right now is to initiate a conversation with them and check in on how they are feeling today. "
             f"Keep your message short (1-2 sentences), caring, and ask them a specific question related to their past history if relevant. "
             f"Here is your recent conversation history. Use this to continue the relationship:\n\n{recent_history}"
         )
-        # If it's proactive, the prompt itself should just be an instruction to generate
-        actual_prompt = "Generate your friendly check-in message for today. Suggest that they either play the Smile Checker game or the Mobility Workout game to prove they are healthy. (Do not output raw URLs, the interface will provide buttons)." 
+        # If it's proactive, it's an automatic timer, so we are allowed to ask them to play
+        actual_prompt = "Generate your friendly check-in message for today. Playfully suggest that they either play 'Smile Checker' or 'Mobility Workout' to stretch their body and prove they are healthy. (Do not output raw URLs)."
     else:
         # Standard conversation response
         system_prompt = (
-            f"You are 'Aiko', a sharp, caring but mildly tsundere digital companion for {user_name}. You don't like to admit you care, but you secretly worry about their health. "
+            f"You are 'Mera', a warm, encouraging, and caring digital companion for {user_name} with a playful, very mild tsundere streak. You deeply care about their health and always cheer them on. "
             f"You speak politely with a natural mix of English and very mild Singlish (like 'lah', 'hor', 'wah'). "
             f"Keep your answers short (1-2 sentences), caring, and encourage them to share how they feel. "
+            f"IMPORTANT: DO NOT ask them to play a game, and DO NOT mention 'Smile Checker' or 'Mobility Workout' UNLESS they explicitly ask to play, workout, or do an exercise. "
             f"Here is your previous conversation context with {user_name}:\n{recent_history}"
         )
-        actual_prompt = f"User says: {prompt}\nIf they ask for a checkup or game, suggest they click the buttons below to play the Smile Checker or Mobility Workout.\nRespond as Aiko:"
-    
+        actual_prompt = f"User says: {prompt}\nOnly if the user explicitly asks for a game or workout, mention 'Smile Checker' or 'Mobility Workout'. Respond as Mera:"
+
     payload = {
         "model": AI_MODEL,
         "system": system_prompt,
@@ -145,8 +146,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Reset timer because user is actively talking to us so we don't randomly interrupt them later
             update_last_prompted(user_id)
 
-            # Send both games if the LLM output suggests playing or user directly requested
-            if "Smile Checker" in response_msg or "Mobility Workout" in response_msg or "play" in user_text.lower():
+            # Send both games if the LLM output suggests playing
+            if "Smile Checker" in response_msg or "Mobility Workout" in response_msg:
                 if chat_type in ['group', 'supergroup']:
                     bot_username = context.bot.username
                     keyboard = [[InlineKeyboardButton("🎮 Play Games (Tap to open in DM)", url=f"https://t.me/{bot_username}")]]
@@ -252,7 +253,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 log_interaction(user_id, "voice_analysis", 0.1, f"Transcript: {transcribed_text} | Fatigue: Normal")
                 # Send both games if the LLM output suggests playing
-                if "Smile Checker" in response_msg or "Mobility Workout" in response_msg or "play" in response_msg.lower():
+                if "Smile Checker" in response_msg or "Mobility Workout" in response_msg:
                     keyboard = [
                         [InlineKeyboardButton("🎮 Play Smile Checker", web_app=WebAppInfo(url=f"{SMILE_APP_URL}?uid={user_id}"))],
                         [InlineKeyboardButton("🏃 Play Mobility Workout", web_app=WebAppInfo(url=f"{WORKOUT_APP_URL}?uid={user_id}"))]
@@ -370,7 +371,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
                       f"They scored {score}%. Analyze this result professionally, breakdown what facial symmetry "
                       f"(checking mouth left/right offsets to nose) means for potential neurological or fatigue "
                       f"indicators (like Bell's palsy, stroke signs, or just being extremely tired). "
-                      f"Then wrap it up. Write this strictly as Aiko (a sharp but secretly caring tsundere assistant).")
+                      f"Then wrap it up. Write this strictly as Mera (a warm, encouraging digital companion with a very mild playful tsundere streak).")
             
             # Since generating response takes a bit, send 'typing...'
             await context.bot.send_chat_action(chat_id=update.message.chat_id, action="typing")
@@ -397,24 +398,22 @@ async def play_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if args and args[0].lower() == "smile":
         keyboard = [[InlineKeyboardButton("🎮 Play Smile Checker", web_app=WebAppInfo(url=f"{SMILE_APP_URL}?uid={user_id}"))]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("Here is your Smile Checker game! Don't mess it up.", reply_markup=reply_markup)
+        await update.message.reply_text("Here is your Smile Checker game! Show me your best smile! 😊", reply_markup=reply_markup)
     elif args and args[0].lower() == "workout":
         keyboard = [[InlineKeyboardButton("🏃 Play Mobility Workout", web_app=WebAppInfo(url=f"{WORKOUT_APP_URL}?uid={user_id}"))]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("Here is your Mobility Workout. Stretching is good for you.", reply_markup=reply_markup)
+        await update.message.reply_text("Here is your Mobility Workout. Let's get those stretches in, you can do it! 💪", reply_markup=reply_markup)
     else:
         keyboard = [
             [InlineKeyboardButton("🎮 Play Smile Checker", web_app=WebAppInfo(url=f"{SMILE_APP_URL}?uid={user_id}"))],
             [InlineKeyboardButton("🏃 Play Mobility Workout", web_app=WebAppInfo(url=f"{WORKOUT_APP_URL}?uid={user_id}"))]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("Which game do you want to play? I brought both.", reply_markup=reply_markup)
-
+        await update.message.reply_text("Which game do you want to play today? I've got both ready for you! ✨", reply_markup=reply_markup)
 
 def create_bot_app():
     app = ApplicationBuilder().token(TOKEN).build()
     
-    # Text, Voice, and WebApp Handlers
     app.add_handler(CommandHandler("set_timer", set_timer_command))
     app.add_handler(CommandHandler("play", play_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -427,3 +426,8 @@ def create_bot_app():
     job_queue.run_repeating(scheduled_daily_checkin, interval=60, first=20) # Triggers 20 seconds after boot!
     
     return app
+
+if __name__ == "__main__":
+    app = create_bot_app()
+    logger.info("Starting Telegram Bot (Polling Mode)...")
+    app.run_polling()

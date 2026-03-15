@@ -1,135 +1,125 @@
-# MERaLiON Health Prototype - NUS-SYNAPXE-IMDA AI Innovation Challenge 2026 🦁
+# MERaLiON Health Prototype - NUS-SYNAPXE AI Innovation Challenge 2026 🦁
 
-Welcome to the MERaLiON Health Prototype! This repository hosts a full-stack, multimodal health and wellness AI assistant that interfaces entirely through a Telegram Bot. It is powered locally by the **SEA-LION 3.5 8B** model, Next.js web mini-apps, MediaPipe pose tracking, and an ensemble of FastAPI orchestration bridges.
+## 🌟 The Pitch & Premise
+**Frictionless Healthcare without Boundaries.** 
+The biggest hurdle to remote healthcare monitoring in the elderly and vulnerable populations is the friction of technology—downloading apps, setting up accounts, logging in, and navigating unfamiliar UIs. 
+
+**Why a Telegram Bot instead of a Native App?**
+*   **Zero-Friction Convenience:** Telegram is an app the elderly and their families *already use* daily for communication. There is nothing new to learn or install.
+*   **Unmatched Engagement:** When comparing the chances of user engagement between an isolated "Health App Push Notification" and a native "Telegram message from a friend", the chat message wins by a landslide. 
+*   **Absolute Simplicity:** No tech skills are required to operate this tool. The user simply talks to the bot using text or voice. The bot operates in the background, proactively messaging at set intervals to do light check-ins and deploy tools when necessary.
+
+**Our Solution:** We bypass app installation entirely. The entire patient journey is hosted inside **Telegram**. Using advanced Sovereign Large Language Models (SEA-LION/MERaLiON) and a highly robust **Open Claw architecture**, our solution acts as an empathetic digital companion. Through casual conversation, the system performs *background multimodal health screening*. 
+
+When a vulnerability is detected (e.g., voice fatigue, signs of cognitive decline in audio, or depressive text), the agent dynamically triggers its tools and seamlessly launches localized **Telegram Mini Apps (WebRTC Machine Learning)** to perform active, gamified physiological assessments—all without the user ever explicitly leaving the chat.
 
 ---
 
-## 🏗️ Architecture
+## 🎯 The Problem Statement
+**Tackling Problem Statement 2: AI for Multimodal Remote Health and Wellness Monitoring.**
+Our platform delivers on the goal of accessible, non-contact, and continuous monitoring of wellness, stress, and physiological signals. By intelligently fusing **Audio & Linguistic analysis** (passive tracking) with **Visual Pose & Facial tracking** (active assessment), we form a comprehensive and entirely frictionless health trendline for clinicians. 
 
-```mermaid
+---
+
+## 🧠 The Companion Bot: "Mera" (@Meramerarabot)
+
+<img src="images/CasualChat.png" alt="Casual Chat" width="300" />
+
+Mera serves as a deeply caring, protective digital guardian with a localized touch.
+
+*   **Personality & Tendencies:** Warm, empathetic, yet highly protective. It speaks the user's language (integrating Singlish/regional nuances). It's explicitly designed to care deeply for the user without causing medical panic. Its built-in tendency is to disguise serious health interventions as fun minigames. (*"Eh, since you sound a bit tired recently, let's play a quick memory or stretching game to wake you up!"*)
+*   **Dual-Modality Chat (Audio & Text):** 
+    *   **High-Fidelity Audio Transcriber:** Capable of natively digesting voice notes. It leverages an advanced transcriber pipeline and specialized local acoustic models to screen vocal signatures for slurring, trailing pauses, and voice fatigue—early indicators of stroke or depressive cognitive decline.
+    *   **Semantic Text Assessment:** Continuously parses standard text strings for conversational sentiment, instantly isolating distress keywords and emotional decay over time.
+
+---
+
+## ⚙️ High-Tech Implementations & The "Open Claw" Magic
+The core system is vastly more than a simple chatbot—it is an ensemble of bleeding-edge tech:
+1.  **Open Claw Architecture:** The dynamic backbone. The system implements versatile "Open Claw" tool-calling, granting the bot an array of skills. It autonomously routes user inputs—deciding in real-time when to invoke the audio transcriber, run clinical sentiment analysis, or deploy targeted Telegram WebApps based entirely on context.
+2.  **Privacy-First WebAssembly (WASM) Vision:** Our Next.js Telegram Mini Apps perform all *camera-based facial mesh and skeletal tracking locally within the phone’s browser*. Zero video data is sent to the cloud. It calculates a 'Symmetry or Mobility Score' natively, ensuring 100% data privacy and frictionless deployment. 
+3.  **Local Edge Inference (SEA-LION / MERaLiON):** Relying on IMDA/AI Singapore's models optimized for Southeast Asian cultural grounding.
+
+---
+
+## 🔄 The System Finite State Machines (FSM)
+
+### 1. Macro Application FSM (The Patient Journey)
+*   **State 0: Empathic Surface (Idle Monitoring):** The bot engages in standard companionship text/audio chat. Natural transcribers and NLP models parse incoming modalities continuously.
+*   **State 1: Dynamic Escalation (The Bridge):** An anomaly is logged via the transcribers/ML (e.g., negative text threshold crossed). The LLM automatically transitions priority from "Chat" to "Diagnostics", utilizing Open Claw to inject a diagnostic Mini App button.
+*   **State 2: Active Gamified Assessment (Visual/Motor):** The user engages the WebApp over their camera. Client-side MediaPipe tracks high-framerate skeletal joints or 478-point facial meshes.
+*   **State 3: Data Aggregation & Intervention:** The game computes interval metrics, POSTs to the FastAPI backend, evaluates the timeline curve, and orchestrates caretaker alerts if critical thresholds are broken.
+
+### 2. Micro Gameplay FSM (Clinical Visual Tracking)
+Within our Next.js frontend, we employ rigorous biomechanical State Machines to guarantee clinical compliance, bypassing any ability for the user to "cheat" the camera.
+
+<img src="images/games.jpg" alt="Mini Games Menu" width="300" />
+
+#### A. The Active Mobility Game
+<img src="images/MobilityChecker.png" alt="Mobility Checker" width="300" />
+
+We dynamically map **33 body posture landmarks** in 3D space, calculating strict angular thresholds (e.g. knee-flexion, shoulder-to-hip bounds).
+*   **Exercise 1: Sit-to-Stand Test** 
+    *   *The Purpose:* Clinically validated indicator of lower body strength and fall risk in geriatrics. 
+    *   *The FSM:* STANDING ➡️ SIT_DOWN (Transition requires hip Y-coordinates dropping below threshold) ➡️ SITTING ➡️ STAND_UP (Requires full knee extension angle ~180°). 
+*   **Exercise 2: Standing March Test (Left/Right Coordination)**
+    *   *The Purpose:* Tests balance and cross-lateral motor control.
+    *   *The FSM:* STANDING_IDLE ➡️ LEFT_KNEE_UP (Angles calculated to ensure knee reaches hip height) ➡️ FOOT_DOWN ➡️ RIGHT_KNEE_UP. The strict FSM prevents rapidly spamming one leg or partial lifts.
+
+#### B. The Smile Checker (Facial Motor Game)
+<img src="images/SmileChecker.png" alt="Smile Checker" width="300" />
+
+We utilize high-density **478-point facial meshes** directly in the browser to detect micro-expressions.
+*   *The Purpose:* To detect early onset signs of stroke (facial drooping, bell's palsy) or general lethargy.
+*   *The FSM / Logic:* Real-time euclidean distance calculation between key focal points (left lip corner vs right lip corner relative to the nose). It tracks symmetrical expansion. If the user only smiles with one half of their dimension, or the smile is weak, the state trigger holds back progression until clinical symmetry is achieved over a sustained 3-second window.
+
+---
+
+## 🚀 Extensions and Scalability: The Innovation Blueprint
+This repository is heavily engineered as a **Proof of Concept Blueprint**, not a rigid product. 
+
+1.  **Modular Skill Architecture:** Because of the Open Claw tooling, the LLM is highly extensible. We can infinitely add new skills mapping beyond its core capability—integrating hospital booking APIs, new physical mini-games (e.g., spiral drawing tests for Parkinson's), or integration with external IoT wearables (Apple Watch HR monitors), all without changing the underlying conversation engine.
+2.  **Cloud-Native Transition:** While the server and SQLite database are currently localized for testing and tight-circle Hackathon deployment, the Next.js / FastAPI / LLM architecture is fully Dockerizable. If adapted by SYNAPXE or other MNCs, this can be seamlessly deployed to secure Cloud Data Centers utilizing powerful enterprise GPUs for vastly superior inference speeds and nationwide scalability. 
+
+---
+
+## 🏗️ Technical Development Architecture
+
+`mermaid
 flowchart TD
-    User([Elderly User]) -->|Chats & Opens Mini-Apps| Telegram[Telegram Bot Client]
+    User([Elderly User]) -->|Texts & Sends Audio Notes| Telegram[Mera Telegram Bot @Meramerarabot]
     
-    subgraph "Local Execution Environment (Your Machine)"
-        Telegram --> |Long-Polling / Webhook| PyBot[Python Telegram Bot `bot.py`]
-        
-        subgraph "Backend System"
-            PyBot <--> |REST API| FastAPI[FastAPI Master Orchestrator `main.py`]
-            FastAPI <--> SQLite[(SQLite `health_data.db`)]
-            FastAPI <--> |Local Inference| Ollama[Ollama Server \n SEA-LION 3.5]
-            FastAPI <--> |Audio & Cognitive Models| ML[Audio / ML Pipeline]
-        end
-        
-        subgraph "Frontend System (Next.js Mini-Apps)"
-            NextJS[Next.js Server `port 3000`]
-            NextJS -- WebRTC/WASM --> ClientDevice[User's Mobile Phone]
-            ClientDevice -- Pose Points --> Browser[Browser MediaPipe]
-        end
+    subgraph "Execution Environment (FastAPI/Python)"
+        Telegram --> |Long-Polling| PyBot[Python Bot Engine via Open Claw Tooling]
+        PyBot <--> |REST API Sync| FastAPI[FastAPI Master Orchestrator]
+        FastAPI <--> SQLite[(Health Analytics DB)]
+        FastAPI <--> |Inference| Ollama[Local SEA-LION Multi-Model]
+        FastAPI <--> |Transcriber| ML[Acoustic ML / Audio Pipeline]
     end
-    
-    Cloudflare([Cloudflare Tunnel / Ngrok \n port 3000]) --> NextJS
-    Telegram --> |Opens WebApp URL| Cloudflare
-    Browser --> |Posts Score| FastAPI
-```
 
-### 📂 Repository Structure
+    subgraph "Mini-App Layer (Next.js Server)"
+        NextJS[Next.js Server]
+        NextJS -- Bootstraps WebRTC --> ClientDevice[User Device Browser]
+        ClientDevice -- Biomechanical FSM Validation --> Browser[WASM MediaPipe CV]
+    end
 
-```text
-├── App Part/
-│   ├── backend/                # Python FastAPI + Telegram Bot Logic
-│   │   ├── main.py             # Express REST API
-│   │   ├── bot.py              # Telegram Long-Polling orchestrator
-│   │   ├── ml_bridge.py        # Connects ML to DB logic
-│   │   ├── database.py         # SQLite connection manager
-│   │   └── health_data.db      # Local Database
-│   └── frontend/               # Next.js App Router (Telegram Mini Apps)
-│       └── app/
-│           ├── chat/           # Text/Audio Chat View 
-│           ├── camera-game/    # Facial Muscle Stretch FSM Game
-│           └── mobility-game/  # Body Mobility Pose FSM Game (Sit & Stand etc.)
-├── ML_stash/                   # Experimental Jupyter Notebooks & raw Python Audio Models
-├── RehabAI_Pipeline/           # Isolated Webcam Tracker logic (Python CV2 Reference)
-├── docs/                       # General documentation / Bot Prompt personas
-├── reference/                  # Legacy hackathon planning PDFs, MDs, specifications
-├── complete-build.bat          # The master magic installer
-└── run.bat                     # The master orchestrator launcher
+    Cloudflare([Cloudflare / Ngrok URL]) --> NextJS
+    Telegram --> |Injects WebView Mini-App| Cloudflare
+    Browser --> |Computes & Submits Interval Score| FastAPI
 ```
 
 ---
+## 🗄️ Backend Logging & Patient Analytics Database
+All patient anomalies, scores, and raw conversation metrics are safely logged into a centralized SQLite schema, allowing immediate clinical auditing or programmatic fallback.
 
-## 🛠️ Tech Stack Used
-* **AI Orchestration**: [Ollama](https://ollama.ai/) running `aisingapore/Llama-SEA-LION-v3.5-8B-R:latest`
-* **Bot Framework**: `python-telegram-bot`
-* **Backend API**: Python 3 `FastAPI` + `Uvicorn`
-* **Frontend Apps**: React `Next.js` (App Router) + `TailwindCSS`
-* **Client-Side Machine Learning**: `@mediapipe/tasks-vision` (WebRTC + WebAssembly for 60fps tracking)
-* **Database**: `SQLite`
-
----
-
-## 🚀 How to Run as a General User (Testing the App)
-
-If you are a judge or a user looking to just *use* the app, **you do not need to install any code, node, or python**. All processing is handled on the host machine. 
-
-1. Wait for the host developer to boot their server and tunnel.
-2. The host will provide you with a **Telegram Bot Username** (e.g. `@MyMERaLiON_Bot`).
-3. Search for the bot on Telegram Mobile or Desktop.
-4. Click **Start** or type *"Hello!"*
-5. The bot (powered by SEA-LION) will chat with you, randomly do check-ins, and selectively deploy "Mini App Games" inside your chat using Telegram WebViews!
-
-*(< INSERT SCREENSHOT OF A CASUAL TELEGRAM CHAT WITH THE BOT SHOWING INLINE BUTTON FOR A GAME HERE >)*
+<div style="display: flex; gap: 10px;">
+  <img src="images/database1.png" alt="Database Logs 1" width="45%" />
+  <img src="images/database2.png" alt="Database Logs 2" width="45%" />
+</div>
 
 ---
+### 💻 Running the Repository Locally
+Please refer to the `complete-build.bat` and `run.bat` initialization scripts. They automate the creation of Python virtual environments, fetching Node dependencies, and spinning up the tri-pane (Next.js, FastAPI, Telegram Bot) micro-service architecture concurrently.
 
-## 💻 How to Run as a Developer (Host)
+<img src="images/3terminalsAfterRunbatch.png" alt="Terminals Running" width="600" />
 
-Because Telegram architecture strictly forbids two local servers polling the *exact same Telegram Bot Token* simultaneously, collaboration requires you to have your own duplicate bot for testing.
-
-### Step 1: Pre-Requisites
-1. Install [Ollama](https://ollama.ai/).
-2. Pull the SEA-LION model locally: 
-   ```bash
-   ollama run aisingapore/Llama-SEA-LION-v3.5-8B-R:latest
-   ```
-3. Install [Node.js](https://nodejs.org/) (v18+) and [Python 3.10+](https://python.org/).
-
-### Step 2: Set up your local Test Bot
-1. Open Telegram and search for `@BotFather`.
-2. Type `/newbot` and follow the prompts to create your own duplicate bot (e.g. `@YourNameTestBot`).
-3. Copy the **HTTP API Token** provided by BotFather.
-4. Open `App Part/backend/bot.py`.
-5. Locate the line `TOKEN = "..."` and replace it with your newly generated test token.
-
-### Step 3: Install Everything Automatically
-Simply double-click the massive installer I've written for you. It builds the virtual environments, installs Python dependencies, checks for `FFmpeg`, and runs `npm install` for Next.js in one go.
-```bash
-# In the root repo layer:
-.\complete-build.bat
-```
-
-### Step 4: Expose the Frontend to the Internet (Crucial)
-Telegram Mini Apps *require* an `HTTPS` URL to load inside the phone. You cannot serve `localhost` to Telegram.
-1. Download [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) or run:
-   ```bash
-   cloudflared tunnel --url http://127.0.0.1:3000
-   ```
-2. Cloudflare will spit out a random green URL (e.g., `https://random-words.trycloudflare.com`).
-3. Update the `BASE_URL` variable inside `App Part/backend/bot.py` with this exact link!
-
-### Step 5: Boot the Megazord 🚀
-Double click the launcher:
-```bash
-.\run.bat
-```
-This script will:
-1. Kill any dangling node/python servers you left alive accidentally.
-2. Launch the **FastAPI Bridge** (Port 8080) automatically connected to SQLite.
-3. Launch the **NextJS Frontend** (Port 3000).
-4. Launch the **Telegram Bot Poller** attached to your custom token.
-
-*(< INSERT SCREENSHOT OF THE 3 TERMINAL WINDOWS (FASTAPI, NEXTJS, BOT) RUNNING SUCCESSFULLY HERE >)*
-
-### Common Troubleshooting During Dev:
-- **Bot responds duplicate times:** Make sure you don't have multiple terminals running `bot.py` or `.bat` files open simultaneously. Run `taskkill /F /IM python.exe` via powershell if desperate.
-- **Can't load minigame:** Your Cloudflare tunnel URL probably rotated. Restart the tunnel, paste the new link into `bot.py`, and restart `run.bat`.
-- **MediaPipe crashes locally:** Make sure you are accessing the app from an `https://` proxy, otherwise modern web browsers block Webcam access citing security flaws.
