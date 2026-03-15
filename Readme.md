@@ -1,5 +1,9 @@
 # MERaLiON Health Prototype - NUS-SYNAPXE AI Innovation Challenge 2026 🦁
 
+<div align="center">
+  <img src="images/mera.png" alt="Mera - The Digital Health Companion" width="180" style="border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin: 20px 0;" />
+</div>
+
 ## 🌟 The Pitch & Premise
 **Frictionless Healthcare without Boundaries.** 
 The biggest hurdle to remote healthcare monitoring in the elderly and vulnerable populations is the friction of technology—downloading apps, setting up accounts, logging in, and navigating unfamiliar UIs. 
@@ -124,7 +128,18 @@ All patient anomalies, scores, and raw conversation metrics are safely logged in
 
 ---
 ### 💻 Running the Repository Locally
-Please refer to the `complete-build.bat` and `run.bat` initialization scripts. They automate the creation of Python virtual environments, fetching Node dependencies, and spinning up the tri-pane (Next.js, FastAPI, Telegram Bot) micro-service architecture concurrently.
+
+We've designed the deployment to be completely frictionless for non-technical judges or testers, while still giving developers raw access to the underlying backend logs.
+
+#### 🎯 For Ordinary Testers & Judges (The "1-Click" Quick Execution)
+If you just want to run the full stack and see the magic, you don't need to manually touch the directories! Just use our thick, hard-coded batch scripts to auto-mount everything.
+
+1. **First-time Setup:** run `complete-build.bat` in the root folder. It will deeply penetrate the dependency tree, fetching all Node Modules, Python properties, and checking FFmpeg dependencies for you.
+2. **Launch the Stack:** run `run.bat`. This automatically opens three synchronized terminals side-by-side (giving you a full view of Next.js, FastAPI, and the PyBot orchestration) and exposes the local ports.
 
 <img src="images/3terminalsAfterRunbatch.png" alt="Terminals Running" width="600" />
+
+#### 🛠️ For Developers (Manual Deep-Dive)
+If you want to manually debug the micro-service architecture, spin the components up individually:
+
 
