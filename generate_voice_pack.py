@@ -29,7 +29,7 @@ def generate_audio():
         filepath = os.path.join(AUDIO_DIR, filename)
         if not os.path.exists(filepath):
             print(f"Generating: {filename} -> '{text}'")
-            tts = gTTS(text=text, lang='en', tld='co.uk', slow=False) # co.uk provides a nice soothing female-ish voice by default
+            tts = gTTS(text=text, lang='en', tld='com.au', slow=False) # com.au provides a distinctly female voice
             tts.save(filepath)
         else:
             print(f"Skipping: {filename} (already exists)")

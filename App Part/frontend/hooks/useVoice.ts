@@ -49,11 +49,19 @@ export function useVoice() {
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(v => v.name.includes('Female') || v.name.includes('Google UK'));
+    // Try to pick the most feminine voice available
+    let preferredVoice = voices.find(v => v.name.toLowerCase().includes('female'));
+    if (!preferredVoice) {
+      // Try Google voices with 'en' and 'female' or 'english' in the name
+      preferredVoice = voices.find(v => (v.name.toLowerCase().includes('google') && (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('english'))));
+    }
+    if (!preferredVoice) {
+      // Fallback: pick the highest-pitch voice
+      preferredVoice = voices.sort((a, b) => (b.pitch || 1) - (a.pitch || 1))[0];
+    }
     if (preferredVoice) utterance.voice = preferredVoice;
-    
     utterance.rate = 1.0;
-    utterance.pitch = 1.0;
+    utterance.pitch = 1.4; // Higher pitch for more feminine sound
     window.speechSynthesis.speak(utterance);
   };
 

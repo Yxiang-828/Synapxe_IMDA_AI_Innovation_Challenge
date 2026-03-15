@@ -41,7 +41,7 @@ AI_MODEL = "aisingapore/Llama-SEA-LION-v3.5-8B-R:latest" # Fallback to llama3.2 
 # Next.js Telegram Mini App URL (for now, pointing to local tunnel or localhost)
 # In production, this must be HTTPS (e.g. ngrok or vercel)
 # You MUST replace this with your actual tunneling service URL (ngrok, localtunnel, etc.)
-BASE_URL = "https://brochure-males-prepaid-derek.trycloudflare.com"
+BASE_URL = "https://vegetables-feel-acrylic-trip.trycloudflare.com"
 SMILE_APP_URL = f"{BASE_URL}/camera-game"
 WORKOUT_APP_URL = f"{BASE_URL}/mobility-game"
 HEART_APP_URL = f"{BASE_URL}/heart-rate"
