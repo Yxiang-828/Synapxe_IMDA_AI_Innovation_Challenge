@@ -78,7 +78,25 @@ Within our Next.js frontend, we employ rigorous biomechanical State Machines to 
 <img src="images/games.jpg" alt="Mini Games Menu" width="300" />
 
 #### A. The Active Mobility Game
-<img src="images/MobilityChecker.png" alt="Mobility Checker" width="300" />
+
+<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
+    <div style="flex: 0 0 48%; text-align: center;">
+        <img src="images/front.png" alt="Front View" width="220" /><br/>
+        <span style="font-size: 1em;">Front View</span>
+    </div>
+    <div style="flex: 0 0 48%; text-align: center;">
+        <img src="images/raiseHands.png" alt="Raise Hands" width="220" /><br/>
+        <span style="font-size: 1em;">Raise Hands</span>
+    </div>
+    <div style="flex: 0 0 48%; text-align: center; margin-top: 10px;">
+        <img src="images/sideways.png" alt="Sideways" width="220" /><br/>
+        <span style="font-size: 1em;">Sideways</span>
+    </div>
+    <div style="flex: 0 0 48%; text-align: center; margin-top: 10px;">
+        <img src="images/sit.png" alt="Sit" width="220" /><br/>
+        <span style="font-size: 1em;">Sit</span>
+    </div>
+</div>
 
 We dynamically map **33 body posture landmarks** in 3D space $(x, y, z)$, calculating strict joint angles $\theta$ using the dot product of 3D vectors $\vec{v}_1, \vec{v}_2$:
 
