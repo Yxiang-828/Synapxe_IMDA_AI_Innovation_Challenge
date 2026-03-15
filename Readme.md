@@ -2,6 +2,9 @@
 
 <div align="center">
   <img src="images/mera_circular.png" alt="Mera - The Digital Health Companion" width="180" style="box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin: 20px 0;" />
+  <h1 style="font-size: 2em; margin: 10px 0;">Mera</h1>
+  <p style="font-size: 1.2em; color: #666;">The Digital Health Companion</p>
+  <p style="font-size: 1em; margin-top: 20px;">DM our working prototype on Telegram: <strong>@Meramerarabot</strong></p>
 </div>
 
 ## 🌟 The Pitch & Premise
