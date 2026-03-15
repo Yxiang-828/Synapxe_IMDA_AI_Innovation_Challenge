@@ -1,4 +1,4 @@
-# MERaLiON Health Prototype - NUS-SYNAPXE AI Innovation Challenge 2026 🦁
+# Meramerara - NUS-SYNAPXE AI Innovation Challenge 2026 🦁
 
 <div align="center">
   <img src="images/mera_circular.png" alt="Mera - The Digital Health Companion" width="180" style="box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin: 20px 0;" />
