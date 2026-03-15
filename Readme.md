@@ -58,20 +58,25 @@ Within our Next.js frontend, we employ rigorous biomechanical State Machines to 
 #### A. The Active Mobility Game
 <img src="images/MobilityChecker.png" alt="Mobility Checker" width="300" />
 
-We dynamically map **33 body posture landmarks** in 3D space, calculating strict angular thresholds (e.g. knee-flexion, shoulder-to-hip bounds).
+We dynamically map **33 body posture landmarks** in 3D space $(x, y, z)$, calculating strict joint angles $\theta$ using the dot product of 3D vectors $\vec{v}_1, \vec{v}_2$:
+
+$$ \theta = \arccos\left(\frac{\vec{v}_1 \cdot \vec{v}_2}{|\vec{v}_1| |\vec{v}_2|}\right) $$
+
+This establishes strict angular thresholds (e.g. knee-flexion $\theta_k \approx 180^\circ$, shoulder-to-hip bounding constraints).
 *   **Exercise 1: Sit-to-Stand Test** 
     *   *The Purpose:* Clinically validated indicator of lower body strength and fall risk in geriatrics. 
-    *   *The FSM:* STANDING ➡️ SIT_DOWN (Transition requires hip Y-coordinates dropping below threshold) ➡️ SITTING ➡️ STAND_UP (Requires full knee extension angle ~180°). 
+    *   *The FSM:* STANDING ➡️ SIT_DOWN (Transition requires hip $y$-coordinate dropping below threshold: $\Delta y_{hip} < \tau_{sit}$) ➡️ SITTING ➡️ STAND_UP (Requires full knee extension angle $\theta_k \approx 180^\circ$).
 *   **Exercise 2: Standing March Test (Left/Right Coordination)**
     *   *The Purpose:* Tests balance and cross-lateral motor control.
-    *   *The FSM:* STANDING_IDLE ➡️ LEFT_KNEE_UP (Angles calculated to ensure knee reaches hip height) ➡️ FOOT_DOWN ➡️ RIGHT_KNEE_UP. The strict FSM prevents rapidly spamming one leg or partial lifts.
-
-#### B. The Smile Checker (Facial Motor Game)
+    *   *The FSM:* STANDING_IDLE ➡️ LEFT_KNEE_UP (Vector calculations ensure knee $y$ reaches hip level: $y_{knee} \ge y_{hip}$) ➡️ FOOT_DOWN ➡️ RIGHT_KNEE_UP. The strict FSM prevents rapidly spamming one leg or partial lifts.
+*   **Exercise 3: Shoulder Raise & Extension**
+    *   *The Purpose:* Tracks upper body mobility, rotator cuff flexibility, and identifying frozen shoulder risks.
+    *   *The FSM:* ARMS_DOWN ➡️ ARMS_RAISING ➡️ FULL_EXTENSION (Shoulder-to-Elbow-to-Wrist angle $\theta_{arm} \approx 180^\circ$ directly above head, evaluated via $\vec{v}_{shoulder \to elbow} \parallel \vec{v}_{elbow \to wrist}$). Sustained hold times ($t \ge 2s$) are required before logging a valid repetition.
 <img src="images/SmileChecker.png" alt="Smile Checker" width="300" />
 
 We utilize high-density **478-point facial meshes** directly in the browser to detect micro-expressions.
 *   *The Purpose:* To detect early onset signs of stroke (facial drooping, bell's palsy) or general lethargy.
-*   *The FSM / Logic:* Real-time euclidean distance calculation between key focal points (left lip corner vs right lip corner relative to the nose). It tracks symmetrical expansion. If the user only smiles with one half of their dimension, or the smile is weak, the state trigger holds back progression until clinical symmetry is achieved over a sustained 3-second window.
+*   *The FSM / Logic:* Real-time euclidean distance calculation $d = \sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}$ between key focal points (left lip corner vs right lip corner relative to the nose). It tracks symmetrical expansion ratios: $\frac{\| \vec{p}_l - \vec{p}_n \|}{\| \vec{p}_r - \vec{p}_n \|} \approx 1$. If the user only smiles with one half of their face, or the smile is weak (expansion $\Delta$ below threshold $\tau$), the state trigger holds back progression until clinical symmetry is achieved over a sustained $t \ge 3$s window.
 
 ---
 
@@ -85,7 +90,7 @@ This repository is heavily engineered as a **Proof of Concept Blueprint**, not a
 
 ## 🏗️ Technical Development Architecture
 
-`mermaid
+```mermaid
 flowchart TD
     User([Elderly User]) -->|Texts & Sends Audio Notes| Telegram[Mera Telegram Bot @Meramerarabot]
     
