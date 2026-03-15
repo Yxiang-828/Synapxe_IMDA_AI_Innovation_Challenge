@@ -1,15 +1,15 @@
 # MERaLiON Health Prototype - NUS-SYNAPXE AI Innovation Challenge 2026 🦁
 
 <div align="center">
-  <img src="images/mera.png" alt="Mera - The Digital Health Companion" width="180" style="border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin: 20px 0;" />
+  <img src="images/mera_circular.png" alt="Mera - The Digital Health Companion" width="180" style="box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin: 20px 0;" />
 </div>
 
 ## 🌟 The Pitch & Premise
 **Frictionless Healthcare without Boundaries.** 
-The biggest hurdle to remote healthcare monitoring in the elderly and vulnerable populations is the friction of technology—downloading apps, setting up accounts, logging in, and navigating unfamiliar UIs. 
+The biggest hurdle to remote healthcare monitoring in chronic patients and vulnerable populations is the friction of technology—downloading apps, setting up accounts, logging in, and navigating unfamiliar UIs.
 
 **Why a Telegram Bot instead of a Native App?**
-*   **Zero-Friction Convenience:** Telegram is an app the elderly and their families *already use* daily for communication. There is nothing new to learn or install.
+*   **Zero-Friction Convenience:** Telegram is an app that chronic patients and their families *already use* daily for communication. There is nothing new to learn or install.
 *   **Unmatched Engagement:** When comparing the chances of user engagement between an isolated "Health App Push Notification" and a native "Telegram message from a friend", the chat message wins by a landslide. 
 *   **Absolute Simplicity:** No tech skills are required to operate this tool. The user simply talks to the bot using text or voice. The bot operates in the background, proactively messaging at set intervals to do light check-ins and deploy tools when necessary.
 
@@ -96,7 +96,7 @@ This repository is heavily engineered as a **Proof of Concept Blueprint**, not a
 
 ```mermaid
 flowchart TD
-    User([Elderly User]) -->|Texts & Sends Audio Notes| Telegram[Mera Telegram Bot @Meramerarabot]
+    User([Chronic Patient]) -->|Texts & Sends Audio Notes| Telegram[Mera Telegram Bot @Meramerarabot]
     
     subgraph "Execution Environment (FastAPI/Python)"
         Telegram --> |Long-Polling| PyBot[Python Bot Engine via Open Claw Tooling]
