@@ -139,7 +139,5 @@ If you just want to run the full stack and see the magic, you don't need to manu
 
 <img src="images/3terminalsAfterRunbatch.png" alt="Terminals Running" width="600" />
 
-#### 🛠️ For Developers (Manual Deep-Dive)
-If you want to manually debug the micro-service architecture, spin the components up individually:
 
 
