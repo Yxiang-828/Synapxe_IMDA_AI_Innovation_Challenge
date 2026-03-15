@@ -34,10 +34,25 @@ Our platform delivers on the goal of accessible, non-contact, and continuous mon
 
 Mera serves as a deeply caring, protective digital guardian with a localized touch.
 
-*   **Personality & Tendencies:** Warm, empathetic, yet highly protective. It speaks the user's language (integrating Singlish/regional nuances). It's explicitly designed to care deeply for the user without causing medical panic. Its built-in tendency is to disguise serious health interventions as fun minigames. (*"Eh, since you sound a bit tired recently, let's play a quick memory or stretching game to wake you up!"*)
-*   **Dual-Modality Chat (Audio & Text):** 
-    *   **High-Fidelity Audio Transcriber:** Capable of natively digesting voice notes. It leverages an advanced transcriber pipeline and specialized local acoustic models to screen vocal signatures for slurring, trailing pauses, and voice fatigue—early indicators of stroke or depressive cognitive decline.
-    *   **Semantic Text Assessment:** Continuously parses standard text strings for conversational sentiment, instantly isolating distress keywords and emotional decay over time.
+*   **Personality & Tendencies:** Warm, empathetic, yet highly protective. It speaks the user's language smoothly, caring for the patient's well-being without causing medical panic or overusing forced slang. Its built-in tendency is to disguise serious health interventions as fun minigames. (*"Let's play a quick memory or stretching game to wake you up!"*)
+*   **Targeted Skillset & Multimodal Capabilities:**
+    *   **Text/Memory Analysis:** Uses conversation history, key patient attributes (fatigue, mobility), and real-time inference to generate perfectly empathetic and medically cautious check-ins.
+    *   **High-Fidelity Audio Processing:** Natively digests voice notes. It runs voice data through a local ASR pipeline to transcribe content and dynamically score audio for lethargy and voice fatigue. 
+    *   **Image Processing (A Special Architecture):** Uses an **Image Extractor atop the existing SEA-LION foundation for double image extraction**. This approach radically improves accuracy and reduces hallucinations, allowing Mera to "see" shared patient records or physical states effectively before replying. 
+
+---
+
+## ⚖️ Workflow Distribution: Meralion vs SEA-LION
+
+To achieve maximum performance and clinical safety locally, our architecture delegates responsibilities specifically to the strong suits of our Sovereign LLMs:
+
+### MERaLiON (Multimodal Empathetic Reasoning and Learning in One Network)
+*   **The Speciality:** Understanding not just *what* is said, but *how* it is said.
+*   **Our Workflow Allocation:** MERaLiON excels at natural speech, emotion recognition, and high-quality transcription. We leverage Meralion's underlying philosophy for empathetic voice tracking: dissecting tone, user fatigue, and code-switching in audio inputs. This provides the emotional parameters and deep empathetic anchoring necessary for elderly companionship.
+
+### SEA-LION (Southeast Asian Languages in One Network)
+*   **The Speciality:** Linguistic context, reasoning, generation, and safe medical synthesis. 
+*   **Our Workflow Allocation:** SEA-LION executes the heavy-duty clinical processing. When interpreting post-minigame metrics (e.g., Facial Symmetry variance, R-PPG heart rate, or complex multi-joint mobility scores) and routing RAG-style factual outputs, we lean fully on SEA-LION. It grounds responses in real guidelines (AHA, CDC) without inventing fake medicine, processes complex JSON parameters, and runs our dual-image extractor module for high-density document reading.
 
 ---
 
@@ -84,6 +99,21 @@ This establishes strict angular thresholds (e.g. knee-flexion $\theta_k \approx 
 We utilize high-density **478-point facial meshes** directly in the browser to detect micro-expressions.
 *   *The Purpose:* To detect early onset signs of stroke (facial drooping, bell's palsy) or general lethargy.
 *   *The FSM / Logic:* Real-time euclidean distance calculation $d = \sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}$ between key focal points (left lip corner vs right lip corner relative to the nose). It tracks symmetrical expansion ratios: $\frac{\| \vec{p}_l - \vec{p}_n \|}{\| \vec{p}_r - \vec{p}_n \|} \approx 1$. If the user only smiles with one half of their face, or the smile is weak (expansion $\Delta$ below threshold $\tau$), the state trigger holds back progression until clinical symmetry is achieved over a sustained $t \ge 3$s window.
+
+#### C. The Heart Rate Game (Remote Photoplethysmography)
+<img src="images/HeartRateChecker.png" alt="Heart Rate Checker" width="300" />
+
+We utilize **Remote Photoplethysmography (rPPG)** to extract heart rate from subtle color changes in the skin via the device camera. The algorithm samples the red channel intensity over time, applies bandpass filtering to isolate cardiac frequencies (0.5-4 Hz), and detects peaks corresponding to heartbeats.
+*   *The Purpose:* To measure resting heart rate non-invasively, detecting tachycardia or bradycardia as early indicators of cardiovascular issues.
+*   *The FSM / Logic:* Real-time sampling of red pixel intensities $I_r(t)$ from a centered facial region. Bandpass filtering removes low-frequency lighting drift and high-frequency noise:
+
+  Low-pass: $I_{lp}(t) = \frac{1}{w} \sum_{i=t-w+1}^{t} I_r(i)$ where $w = \lceil 0.15 \cdot f \rceil$ (smooths ~150ms at frame rate $f$).
+
+  High-pass: $I_{hp}(t) = I_{lp}(t) - I_{trend}(t)$, where $I_{trend}(t) = \frac{1}{w_t} \sum_{i=t-w_t+1}^{t} I_{lp}(i)$ and $w_t = \lceil 1.5 \cdot f \rceil$ (removes slow drift over ~1.5s).
+
+  Peak detection identifies local maxima in $I_{hp}(t)$ with minimum distance $d_{min} = \lceil 0.3 \cdot f \rceil$ (prevents double-counting). BPM is calculated as $\frac{\text{peaks}}{\Delta t} \times 60$, where $\Delta t$ is the actual elapsed time (not assumed FPS).
+
+  The FSM enforces a 20-second measurement window, rejecting readings outside 30-220 BPM or with insufficient signal quality (variance threshold).
 
 ---
 
@@ -141,6 +171,14 @@ If you just want to run the full stack and see the magic, you don't need to manu
 2. **Launch the Stack:** run `run.bat`. This automatically opens three synchronized terminals side-by-side (giving you a full view of Next.js, FastAPI, and the PyBot orchestration) and exposes the local ports.
 
 <img src="images/3terminalsAfterRunbatch.png" alt="Terminals Running" width="600" />
+
+#### 🎮 Game Access Shortcuts
+Once the stack is running, you can access the mini-games directly via these commands when in DM with @Meramerarabot
+
+- **Smile Checker (Facial Symmetry):** `/play smile`
+- **Mobility Workout:** `/play workout`
+- **Heart Rate Monitor:** `/play heart`
+
 
 
 

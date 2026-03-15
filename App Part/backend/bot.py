@@ -8,9 +8,24 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppI
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, CommandHandler, filters
 from database import get_or_create_patient, log_interaction, log_chat_message, get_recent_history, update_patient_interval, update_last_prompted
 import ml_bridge  # Import our new Transcription mapping!
+from document_handler import handle_document, handle_photo
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Simple file-based lock so only one local bot instance runs.
+LOCK_FILE = os.path.join(os.path.dirname(__file__), "bot.lock")
+
+def acquire_lock() -> int | None:
+    """
+    Returns an open file descriptor if lock acquired, or None if another instance holds it.
+    """
+    try:
+        fd = os.open(LOCK_FILE, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(fd, str(os.getpid()).encode("utf-8"))
+        return fd
+    except FileExistsError:
+        return None
 
 # --- Global Queue Tracking ---
 processing_lock = asyncio.Lock()
@@ -26,32 +41,65 @@ AI_MODEL = "aisingapore/Llama-SEA-LION-v3.5-8B-R:latest" # Fallback to llama3.2 
 # Next.js Telegram Mini App URL (for now, pointing to local tunnel or localhost)
 # In production, this must be HTTPS (e.g. ngrok or vercel)
 # You MUST replace this with your actual tunneling service URL (ngrok, localtunnel, etc.)
-BASE_URL = "https://victorian-whatever-buyers-mrna.trycloudflare.com"
+BASE_URL = "https://twenty-social-ceremony-selective.trycloudflare.com"
 SMILE_APP_URL = f"{BASE_URL}/camera-game"
-WORKOUT_APP_URL = f"{BASE_URL}/mobility-game" 
+WORKOUT_APP_URL = f"{BASE_URL}/mobility-game"
+HEART_APP_URL = f"{BASE_URL}/heart-rate"
 
 import re
 
-async def get_llm_response(user_id: str, prompt: str, user_name: str, is_proactive: bool = False) -> str:
+def sanitize_telegram_text(text: str) -> str:
+    """
+    Strip common Markdown markers so Telegram displays clean plain text.
+    """
+    # Bold / italic markers
+    text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
+    text = re.sub(r"__(.*?)__", r"\1", text)
+    text = re.sub(r"_(.*?)_", r"\1", text)
+    # Inline code
+    text = re.sub(r"`([^`]*)`", r"\1", text)
+    # Headings like "# Title"
+    text = re.sub(r"^#+\s*", "", text, flags=re.MULTILINE)
+    return text
+
+async def get_llm_response(user_id: str, prompt: str, patient_info: dict, is_proactive: bool = False) -> str:
     # 1. Fetch the user's recent chat history
     recent_history = get_recent_history(user_id, limit=6)
+    
+    # Extract patient info dynamically
+    user_name = patient_info.get("name", "User")
+    fatigue = patient_info.get("fatigue_score", 0.0)
+    mobility = patient_info.get("mobility_score", 0.0)
+    last_interaction = patient_info.get("last_interaction", "Unknown")
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    patient_context_block = (
+        f"--- Patient File ---\n"
+        f"Name: {user_name}\n"
+        f"Current Date/Time: {current_time}\n"
+        f"Last Interaction Time: {last_interaction}\n"
+        f"General Health Summary (0.0=Good, 1.0=Bad): Fatigue level is {fatigue:.1f}, Mobility concerns level is {mobility:.1f}.\n"
+        f"--------------------\n"
+    )
     
     if is_proactive:
         # State 0 - Proactive AI Ping: The LLM creates the first message to wake them up.
         system_prompt = (
-            f"You are 'Mera', a warm, encouraging, and caring digital companion for {user_name} with a playful, very mild tsundere streak. You deeply care about their health and always cheer them on. "
-            f"You speak politely with a natural mix of English and very mild Singlish (like 'lah', 'hor', 'wah'). "
-            f"Your goal right now is to initiate a conversation with them and check in on how they are feeling today. "
-            f"Keep your message short (1-2 sentences), caring, and ask them a specific question related to their past history if relevant. "
+            f"You are 'Mera', a warm, encouraging, and caring digital health companion for this specific patient. "
+            f"You are highly protective but never cause medical panic. Act natural and conversational.\n\n"
+            f"{patient_context_block}\n"
+            f"Your goal right now is to initiate a proactive conversation with them and check in on how they are feeling today. "
+            f"Keep your message short (1-2 sentences), caring, and ask them a specific question related to their past history or health status if relevant. "
             f"Here is your recent conversation history. Use this to continue the relationship:\n\n{recent_history}"
         )
         # If it's proactive, it's an automatic timer, so we are allowed to ask them to play
-        actual_prompt = "Generate your friendly check-in message for today. Playfully suggest that they either play 'Smile Checker' or 'Mobility Workout' to stretch their body and prove they are healthy. (Do not output raw URLs)."
+        actual_prompt = "Generate your friendly check-in message for today. Suggest casually that they either play 'Smile Checker' or 'Mobility Workout' to stretch their body and prove they are healthy. (Do not output raw URLs)."
     else:
         # Standard conversation response
         system_prompt = (
-            f"You are 'Mera', a warm, encouraging, and caring digital companion for {user_name} with a playful, very mild tsundere streak. You deeply care about their health and always cheer them on. "
-            f"You speak politely with a natural mix of English and very mild Singlish (like 'lah', 'hor', 'wah'). "
+            f"You are 'Mera', a warm, encouraging, and caring digital health companion for this specific patient. "
+            f"You are highly protective but never cause medical panic. Act natural and conversational.\n\n"
+            f"{patient_context_block}\n"
             f"Keep your answers short (1-2 sentences), caring, and encourage them to share how they feel. "
             f"IMPORTANT: DO NOT ask them to play a game, and DO NOT mention 'Smile Checker' or 'Mobility Workout' UNLESS they explicitly ask to play, workout, or do an exercise. "
             f"Here is your previous conversation context with {user_name}:\n{recent_history}"
@@ -74,7 +122,8 @@ async def get_llm_response(user_id: str, prompt: str, user_name: str, is_proacti
             # Strip out <think>...</think> tags which reasoning models sometimes output
             clean_text = re.sub(r'<think>.*?</think>', '', raw_text, flags=re.DOTALL).strip()
             clean_text = clean_text.replace('</s>', '').strip()
-            return clean_text if clean_text else raw_text
+            clean_text = sanitize_telegram_text(clean_text or raw_text)
+            return clean_text
     except Exception as e:
         logger.error(f"Ollama error: {e}")
         # Fallback if SEA-LION isn't loaded
@@ -123,6 +172,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Ensure patient exists in DB
     patient = get_or_create_patient(user_id, user_name)
+    user_name = patient["name"]
     
     # Add to chat history immediately!
     log_chat_message(user_id, "user", user_text)
@@ -137,7 +187,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action='typing')
             
             # 1. Get Conversation Response with context
-            response_msg = await get_llm_response(user_id, user_text, user_name, is_proactive=False)
+            response_msg = await get_llm_response(user_id, user_text, patient, is_proactive=False)
             
             # Log bot response to DB!
             log_chat_message(user_id, "assistant", response_msg)
@@ -146,7 +196,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Reset timer because user is actively talking to us so we don't randomly interrupt them later
             update_last_prompted(user_id)
 
-            # Send both games if the LLM output suggests playing
+            # Send mini apps if the LLM output suggests playing
             if "Smile Checker" in response_msg or "Mobility Workout" in response_msg:
                 if chat_type in ['group', 'supergroup']:
                     bot_username = context.bot.username
@@ -156,7 +206,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 else:
                     keyboard = [
                         [InlineKeyboardButton("🎮 Play Smile Checker", web_app=WebAppInfo(url=f"{SMILE_APP_URL}?uid={user_id}"))],
-                        [InlineKeyboardButton("🏃 Play Mobility Workout", web_app=WebAppInfo(url=f"{WORKOUT_APP_URL}?uid={user_id}"))]
+                        [InlineKeyboardButton("🏃 Play Mobility Workout", web_app=WebAppInfo(url=f"{WORKOUT_APP_URL}?uid={user_id}"))],
+                        [InlineKeyboardButton("❤️ Check Heart Rate", web_app=WebAppInfo(url=f"{HEART_APP_URL}?uid={user_id}"))],
                     ]
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     await update.message.reply_text(response_msg, reply_markup=reply_markup)
@@ -222,7 +273,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
             log_chat_message(user_id, "user", f"[Voice Note]: {transcribed_text}")
 
             # 4. Generate the empathetic LLM response based on WHAT they actually said
-            response_msg = await get_llm_response(user_id, transcribed_text, user_name, is_proactive=False)
+            response_msg = await get_llm_response(user_id, transcribed_text, patient, is_proactive=False)
             
             log_chat_message(user_id, "assistant", response_msg)
             
@@ -242,21 +293,23 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     )
                 else:
                     keyboard = [
-                        [InlineKeyboardButton("🎮 Play Face Check Game", web_app=WebAppInfo(url=f"{SMILE_APP_URL}?uid={user_id}"))]
+                        [InlineKeyboardButton("🎮 Play Face Check Game", web_app=WebAppInfo(url=f"{SMILE_APP_URL}?uid={user_id}"))],
+                        [InlineKeyboardButton("❤️ Check Heart Rate", web_app=WebAppInfo(url=f"{HEART_APP_URL}?uid={user_id}"))],
                     ]
                     reply_markup = InlineKeyboardMarkup(keyboard)
 
                     await update.message.reply_text(
-                        f"{response_msg}\n\nBy the way... your voice sounds a tiny bit tired today lah. Are you feeling okay?\nLet's do a quick facial stretch to make sure! Tap the button below to turn on your camera.",
+                        f"{response_msg}\n\nBy the way... your voice sounds a tiny bit tired today lah. Are you feeling okay?\nWe can do a quick facial stretch or simple heart rate check. Tap one of the buttons below.",
                         reply_markup=reply_markup
                     )
             else:
                 log_interaction(user_id, "voice_analysis", 0.1, f"Transcript: {transcribed_text} | Fatigue: Normal")
-                # Send both games if the LLM output suggests playing
+                # Send mini apps if the LLM output suggests playing
                 if "Smile Checker" in response_msg or "Mobility Workout" in response_msg:
                     keyboard = [
                         [InlineKeyboardButton("🎮 Play Smile Checker", web_app=WebAppInfo(url=f"{SMILE_APP_URL}?uid={user_id}"))],
-                        [InlineKeyboardButton("🏃 Play Mobility Workout", web_app=WebAppInfo(url=f"{WORKOUT_APP_URL}?uid={user_id}"))]
+                        [InlineKeyboardButton("🏃 Play Mobility Workout", web_app=WebAppInfo(url=f"{WORKOUT_APP_URL}?uid={user_id}"))],
+                        [InlineKeyboardButton("❤️ Check Heart Rate", web_app=WebAppInfo(url=f"{HEART_APP_URL}?uid={user_id}"))],
                     ]
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     await update.message.reply_text(response_msg, reply_markup=reply_markup)
@@ -330,15 +383,17 @@ async def scheduled_daily_checkin(context: ContextTypes.DEFAULT_TYPE):
                 logger.info(f"Generating proactive message for {name} ({tg_id}) (Elapsed: {elapsed_mins:.1f}m > Interval: {interval_minutes}m)")
                 
                 # 1. Ask the LLM to generate a creative, contextual check-in
-                proactive_msg = await get_llm_response(tg_id, "", name, is_proactive=True)
+                patient_record = {"name": name, "fatigue_score": fatigue, "mobility_score": mobility, "last_interaction": last_int}
+                proactive_msg = await get_llm_response(tg_id, "", patient_record, is_proactive=True)
                 
                 # 2. Log it
                 log_chat_message(tg_id, "assistant", f"[Proactive] {proactive_msg}")
                 
                 # 3. Send it
                 keyboard = [
-                    [InlineKeyboardButton("🎮 Play Smile Checker", web_app=WebAppInfo(url=f"{SMILE_APP_URL}?uid={tg_id}"))],
-                    [InlineKeyboardButton("🏃 Play Mobility Workout", web_app=WebAppInfo(url=f"{WORKOUT_APP_URL}?uid={tg_id}"))]
+                    [InlineKeyboardButton("🎮 Smile Checker", web_app=WebAppInfo(url=f"{SMILE_APP_URL}?uid={tg_id}"))],
+                    [InlineKeyboardButton("🏃 Mobility Workout", web_app=WebAppInfo(url=f"{WORKOUT_APP_URL}?uid={tg_id}"))],
+                    [InlineKeyboardButton("❤️ Heart Rate Check", web_app=WebAppInfo(url=f"{HEART_APP_URL}?uid={tg_id}"))],
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await context.bot.send_message(chat_id=tg_id, text=proactive_msg, reply_markup=reply_markup)
@@ -382,11 +437,8 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             # so the big ugly Mini App button clears after they play
             from telegram import ReplyKeyboardRemove
             
-            await update.message.reply_text(
-                f"📊 *Health Check Result:*\n{llm_response}", 
-                parse_mode="Markdown", 
-                reply_markup=ReplyKeyboardRemove()
-            )
+            text = "Health check result:\n" + llm_response
+            await update.message.reply_text(text, reply_markup=ReplyKeyboardRemove())
     except Exception as e:
         logger.error(f"Failed to handle webapp data: {e}")
 
@@ -403,13 +455,18 @@ async def play_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton("🏃 Play Mobility Workout", web_app=WebAppInfo(url=f"{WORKOUT_APP_URL}?uid={user_id}"))]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text("Here is your Mobility Workout. Let's get those stretches in, you can do it! 💪", reply_markup=reply_markup)
+    elif args and args[0].lower() in ["heart", "heartrate", "hr"]:
+        keyboard = [[InlineKeyboardButton("❤️ Check Heart Rate", web_app=WebAppInfo(url=f"{HEART_APP_URL}?uid={user_id}"))]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text("Okay, let's check your heart rate. Place your fingertip over the rear camera and follow the instructions.", reply_markup=reply_markup)
     else:
         keyboard = [
             [InlineKeyboardButton("🎮 Play Smile Checker", web_app=WebAppInfo(url=f"{SMILE_APP_URL}?uid={user_id}"))],
-            [InlineKeyboardButton("🏃 Play Mobility Workout", web_app=WebAppInfo(url=f"{WORKOUT_APP_URL}?uid={user_id}"))]
+            [InlineKeyboardButton("🏃 Play Mobility Workout", web_app=WebAppInfo(url=f"{WORKOUT_APP_URL}?uid={user_id}"))],
+            [InlineKeyboardButton("❤️ Check Heart Rate", web_app=WebAppInfo(url=f"{HEART_APP_URL}?uid={user_id}"))],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("Which game do you want to play today? I've got both ready for you! ✨", reply_markup=reply_markup)
+        await update.message.reply_text("Which check do you want to do today? I have Smile Checker, Mobility Workout, and a simple Heart Rate test ready for you.", reply_markup=reply_markup)
 
 def create_bot_app():
     app = ApplicationBuilder().token(TOKEN).build()
@@ -418,6 +475,10 @@ def create_bot_app():
     app.add_handler(CommandHandler("play", play_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(MessageHandler(filters.VOICE, handle_voice))
+    # Documents (PDF medical reports)
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+    # Photos (images of prescriptions, reports etc.)
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
     
     # Proactive Job Queue Configuration

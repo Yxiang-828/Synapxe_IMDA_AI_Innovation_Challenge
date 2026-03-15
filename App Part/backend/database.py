@@ -55,7 +55,7 @@ def init_db():
 def get_or_create_patient(telegram_id: str, name: str):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, fatigue_score, mobility_score, interval_minutes FROM patients WHERE telegram_id = ?", (telegram_id,))
+    cursor.execute("SELECT id, fatigue_score, mobility_score, interval_minutes, name FROM patients WHERE telegram_id = ?", (telegram_id,))
     row = cursor.fetchone()
     
     if not row:
@@ -65,10 +65,16 @@ def get_or_create_patient(telegram_id: str, name: str):
             (telegram_id, name, now_str, now_str, 1440) # default interval 24 hours
         )
         conn.commit()
-        row = (cursor.lastrowid, 0.0, 0.0, 1440)
+        row = (cursor.lastrowid, 0.0, 0.0, 1440, name)
+    else:
+        # Update name if it changed
+        if row[4] != name and name != "Ah Ma":
+            cursor.execute("UPDATE patients SET name = ? WHERE telegram_id = ?", (name, telegram_id))
+            conn.commit()
+            row = (row[0], row[1], row[2], row[3], name)
     
     conn.close()
-    return {"id": row[0], "fatigue_score": row[1], "mobility_score": row[2], "interval_minutes": row[3]}
+    return {"id": row[0], "fatigue_score": row[1], "mobility_score": row[2], "interval_minutes": row[3], "name": row[4]}
 
 def update_patient_interval(telegram_id: str, interval_minutes: int):
     conn = sqlite3.connect(DB_PATH)

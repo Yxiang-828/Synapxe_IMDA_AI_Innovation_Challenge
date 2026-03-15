@@ -41,7 +41,8 @@ if exist "App Part\backend\.venv\Scripts\activate.bat" (
 echo Installing backend dependencies...
 python -m pip install --upgrade pip
 pip install -r "App Part\backend\requirements.txt"
-pip install python-telegram-bot httpx uvicorn fastapi
+REM Extra tools for document + image understanding
+pip install python-telegram-bot httpx uvicorn fastapi easyocr pymupdf4llm
 echo Backend setup complete.
 deactivate
 
